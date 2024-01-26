@@ -10,14 +10,14 @@ module.exports = {
         },
         extend: {
             textColor: {
-                main: 'rgb(var(--color-text-main) / <alpha-value>)'
+                main: 'var(--color-text-main)'
             },
             backgroundColor: {
-                main: 'rgb(var(--color-bg-main) / <alpha-value>)',
-                muted: 'rgb(var(--color-bg-muted) / <alpha-value>)'
+                main: 'var(--color-bg-main)',
+                muted: 'var(--color-bg-muted)'
             },
             borderColor: {
-                main: 'rgb(var(--color-border-main) / <alpha-value>)'
+                main: 'var(--color-border-main)'
             },
             typography: (theme) => ({
                 dante: {

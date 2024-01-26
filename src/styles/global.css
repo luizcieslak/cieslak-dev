@@ -4,16 +4,16 @@
 
 @layer base {
     :root {
-        --color-text-main: 23 23 23; /* #171717 */
-        --color-bg-main: 242 241 236; /* #F2F1EC */
-        --color-bg-muted: 234 233 225; /* #EAE9E1 */
-        --color-border-main: 23 23 23; /* #171717 */
+        --color-text-main: #171717;
+        --color-bg-main: #f2f1ec;
+        --color-bg-muted: #eae9e1;
+        --color-border-main: #171717;
     }
     html.dark {
-        --color-text-main: 242 241 236; /* #F2F1EC */
-        --color-bg-main: 23 23 23; /* #171717 */
-        --color-bg-muted: 36 36 36; /* #242424 */
-        --color-border-main: 242 241 236; /* #F2F1EC */
+        --color-text-main: #f2f1ec;
+        --color-bg-main: #171717;
+        --color-bg-muted: #242424;
+        --color-border-main: #f2f1ec;
     }
 
     /* Cyan */
