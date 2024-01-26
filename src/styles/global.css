@@ -3,21 +3,21 @@
 @tailwind utilities;
 
 @layer base {
-    :root {
-        --color-text-main: #171717;
-        --color-bg-main: #f2f1ec;
-        --color-bg-muted: #eae9e1;
-        --color-border-main: #171717;
-    }
-    html.dark {
-        --color-text-main: #f2f1ec;
-        --color-bg-main: #171717;
-        --color-bg-muted: #242424;
-        --color-border-main: #f2f1ec;
-    }
+	:root {
+		--color-text-main: #171717;
+		--color-bg-main: #f2f1ec;
+		--color-bg-muted: #eae9e1;
+		--color-border-main: #171717;
+	}
+	html.dark {
+		--color-text-main: #f2f1ec;
+		--color-bg-main: #171717;
+		--color-bg-muted: #242424;
+		--color-border-main: #f2f1ec;
+	}
 
-    /* Cyan */
-    /*
+	/* Cyan */
+	/*
     :root {
         --color-text-main: 22 42 43;
         --color-bg-main: 214 224 226;
@@ -32,8 +32,8 @@
     }
     */
 
-    /* Green */
-    /*
+	/* Green */
+	/*
     :root {
         --color-text-main: 58 66 56;
         --color-bg-main: 243 239 230;

@@ -24,9 +24,9 @@ CSS Grid Layout has been a game-changer in web design, allowing developers to cr
 
 ```css
 .container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: 20px;
 }
 ```
 
@@ -36,11 +36,11 @@ Custom properties, or CSS variables, bring a new level of flexibility and mainta
 
 ```css
 :root {
-  --primary-color: #3498db;
+	--primary-color: #3498db;
 }
 
 .button {
-  background-color: var(--primary-color);
+	background-color: var(--primary-color);
 }
 ```
 
@@ -50,10 +50,10 @@ With the rise of dark mode preferences among users, CSS has adapted to provide b
 
 ```css
 @media (prefers-color-scheme: dark) {
-  body {
-    background-color: #1a1a1a;
-    color: #ffffff;
-  }
+	body {
+		background-color: #1a1a1a;
+		color: #ffffff;
+	}
 }
 ```
 
@@ -63,11 +63,11 @@ Scroll Snap enhances the user experience by providing a smooth scrolling effect.
 
 ```css
 .container {
-  scroll-snap-type: y mandatory;
+	scroll-snap-type: y mandatory;
 }
 
 .section {
-  scroll-snap-align: start;
+	scroll-snap-align: start;
 }
 ```
 
@@ -77,7 +77,7 @@ The `clamp()` function is a powerful addition for achieving responsive typograph
 
 ```css
 h1 {
-  font-size: clamp(2rem, 5vw, 4rem);
+	font-size: clamp(2rem, 5vw, 4rem);
 }
 ```
 

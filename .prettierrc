@@ -1,14 +1,18 @@
 {
-    "printWidth": 160,
-    "singleQuote": true,
-    "trailingComma": "none",
-    "tabWidth": 4,
-    "overrides": [
-        {
-            "files": ["*.md", "*.mdx", "*.yaml"],
-            "options": {
-                "tabWidth": 2
-            }
-        }
-    ]
+	"arrowParens": "avoid",
+	"semi": false,
+	"singleQuote": true,
+	"jsxSingleQuote": true,
+	"tabWidth": 2,
+	"useTabs": true,
+	"printWidth": 110,
+	"endOfLine": "auto",
+	"overrides": [
+		{
+			"files": ["*.md", "*.mdx", "*.yaml"],
+			"options": {
+				"tabWidth": 2
+			}
+		}
+	]
 }
