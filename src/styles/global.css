@@ -5,6 +5,19 @@
 @layer base {
 	:root {
 		--color-text-main: #171717;
+		--color-bg-main: #f7eed2;
+		--color-bg-muted: #ede2c2;
+		--color-border-main: #171717;
+	}
+	html.dark {
+		--color-text-main: #f2f1ec;
+		--color-bg-main: #1c0615;
+		--color-bg-muted: #21101c;
+		--color-border-main: #f2f1ec;
+	}
+
+	/* :root {
+		--color-text-main: #171717;
 		--color-bg-main: #f2f1ec;
 		--color-bg-muted: #eae9e1;
 		--color-border-main: #171717;
@@ -14,7 +27,7 @@
 		--color-bg-main: #171717;
 		--color-bg-muted: #242424;
 		--color-border-main: #f2f1ec;
-	}
+	} */
 
 	/* Cyan */
 	/*
