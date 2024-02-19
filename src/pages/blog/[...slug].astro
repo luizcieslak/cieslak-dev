@@ -10,18 +10,26 @@ import { slugify } from '../../utils/common-utils';
 export async function getStaticPaths() {
     const posts = (await getCollection('blog')).sort(sortItemsByDateDesc);
     const postCount = posts.length;
-    return posts.map((post, index) => ({
-        params: { slug: post.slug },
-        props: {
-            post,
-            prevPost: index + 1 !== postCount ? posts[index + 1] : null,
-            nextPost: index !== 0 ? posts[index - 1] : null
-        }
-    }));
+
+
+    return posts.map((post, index) => {
+        const [lang, ...slug] = post.slug.split('/');
+
+        return ({
+            params: { slug: slug.join('/'), lang },
+            props: {
+                post,
+                prevPost: index + 1 !== postCount ? posts[index + 1] : null,
+                nextPost: index !== 0 ? posts[index - 1] : null
+            }
+        })
+    });
 }
 
 type Props = { post: CollectionEntry<'blog'>; prevPost: CollectionEntry<'blog'>; nextPost: CollectionEntry<'blog'> };
 
+const { lang, slug } = Astro.params;
+console.log('lang?', lang)
 const { href } = Astro.url;
 const { post, prevPost, nextPost } = Astro.props;
 const { title, publishDate, updatedDate, excerpt, tags = [], seo } = post.data;

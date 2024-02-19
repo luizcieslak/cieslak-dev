@@ -5,7 +5,7 @@ import tailwind from '@astrojs/tailwind'
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://example.com',
+	site: 'https://cieslak.dev',
 	integrations: [
 		mdx(),
 		sitemap(),
@@ -13,4 +13,12 @@ export default defineConfig({
 			applyBaseStyles: false,
 		}),
 	],
+	i18n: {
+		defaultLocale: 'en',
+		locales: ['en', 'pt-br'],
+		routing: {
+			prefixDefaultLocale: false,
+			redirectToDefaultLocale: true,
+		},
+	},
 })
