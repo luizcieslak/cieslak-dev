@@ -9,16 +9,11 @@
 	"endOfLine": "auto",
 	"overrides": [
 		{
-			"files": [
-				"*.md",
-				"*.mdx",
-				"*.yaml",
-				"*.astro",
-				"*.ts"
-			],
+			"files": ["*.md", "*.mdx", "*.yaml", "*.astro", "*.ts"],
 			"options": {
 				"tabWidth": 2
 			}
 		}
-	]
+	],
+	"plugins": ["prettier-plugin-astro"]
 }
