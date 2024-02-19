@@ -20,5 +20,6 @@ export const ui = {
   'pt-br': {
     'nav.home': 'Início',
     'nav.about': 'Sobre',
+    // 'nav.twitter': 'Twitter',
   },
 } as const;

@@ -9,7 +9,13 @@
 	"endOfLine": "auto",
 	"overrides": [
 		{
-			"files": ["*.md", "*.mdx", "*.yaml", "*.astro"],
+			"files": [
+				"*.md",
+				"*.mdx",
+				"*.yaml",
+				"*.astro",
+				"*.ts"
+			],
 			"options": {
 				"tabWidth": 2
 			}
