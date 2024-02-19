@@ -1,6 +1,12 @@
-export const languages = {
-  en: 'English',
-  fr: 'Français',
+export const langPicker = {
+  en: {
+    icon: '🇺🇸',
+    label: "Change language to English"
+  },
+  'pt-br': {
+    icon:  '🇧🇷',
+    label: "Mudar idioma para Português"
+  }
 };
 
 export const defaultLang = 'en';
