@@ -5,7 +5,7 @@ module.exports = {
 	darkMode: 'class',
 	theme: {
 		fontFamily: {
-			sans: ['Noto Sans', ...defaultTheme.fontFamily.sans],
+			sans: ['Noto Sans Variable', ...defaultTheme.fontFamily.sans],
 			serif: ['Zilla Slab', ...defaultTheme.fontFamily.serif],
 		},
 		extend: {

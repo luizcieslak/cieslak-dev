@@ -16,6 +16,12 @@ dependencies:
   '@astrojs/tailwind':
     specifier: ^5.1.0
     version: 5.1.0(astro@4.4.0)(tailwindcss@3.4.1)
+  '@fontsource-variable/noto-sans':
+    specifier: ^5.0.1
+    version: 5.0.1
+  '@fontsource/zilla-slab':
+    specifier: ^5.0.8
+    version: 5.0.8
   astro:
     specifier: ^4.4.0
     version: 4.4.0(typescript@5.3.3)
@@ -659,6 +665,14 @@ packages:
     requiresBuild: true
     dev: false
     optional: true
+
+  /@fontsource-variable/noto-sans@5.0.1:
+    resolution: {integrity: sha512-XlVsb4O0dQPgl8wupiP4z1HT7BMKVHUvzDQvtC061hB5ylJ+ksDqnI8AsK/Xa9SAoYGXz2K3ehuE76HyEz81OQ==}
+    dev: false
+
+  /@fontsource/zilla-slab@5.0.8:
+    resolution: {integrity: sha512-cFtLUXCoZuZjtTLHRQEiSnxuu4bDFJSOr276UX6E5sGBZi+grDFB2tnHSgTz1GBgHmZWO8udS5d8gJaBJT5uEw==}
+    dev: false
 
   /@isaacs/cliui@8.0.2:
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
