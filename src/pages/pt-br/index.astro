@@ -7,7 +7,7 @@ import PostPreview from '../../components/PostPreview.astro'
 import siteConfig from '../../data/site-config'
 import { sortItemsByDateDesc } from '../../utils/data-utils'
 
-const locale = Astro.currentLocale ?? 'en'
+const locale = Astro.currentLocale ?? 'pt-br'
 const posts = (await getCollection('blog'))
 	.sort(sortItemsByDateDesc)
 	.filter(post => post.slug.includes(locale))
@@ -20,7 +20,7 @@ const posts = (await getCollection('blog'))
 	{
 		posts?.length > 0 && (
 			<div class='mb-16 sm:mb-24'>
-				<h2 class='mb-12 text-xl font-serif italic sm:mb-16 sm:text-2xl'>Writing</h2>
+				<h2 class='mb-12 text-xl font-serif italic sm:mb-16 sm:text-2xl'>Artigos</h2>
 				{posts.map(post => (
 					<PostPreview post={post} class='mb-10 sm:mb-12' headingLevel='h3' />
 				))}
