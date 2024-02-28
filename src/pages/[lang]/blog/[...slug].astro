@@ -31,8 +31,6 @@ type Props = {
 	nextPost: CollectionEntry<'blog'>
 }
 
-const { lang, slug } = Astro.params
-console.log('lang?', lang)
 const { href } = Astro.url
 const { post, prevPost, nextPost } = Astro.props
 const { title, publishDate, updatedDate, excerpt, tags = [], seo } = post.data

@@ -31,4 +31,8 @@ export const routes = {
 		about: 'sobre',
 		contact: 'contato',
 	},
+	en: {
+		about: 'about',
+		contact: 'contact',
+	},
 }
