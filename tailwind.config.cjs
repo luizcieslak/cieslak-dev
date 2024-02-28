@@ -1,12 +1,15 @@
 const defaultTheme = require('tailwindcss/defaultTheme')
 
+const serif = 'Zilla Slab'
+const sans = 'Noto Sans Variable'
+
 module.exports = {
 	content: ['./src/**/*.{astro,html,js,jsx,md,mdx,ts,tsx}'],
 	darkMode: 'class',
 	theme: {
 		fontFamily: {
-			sans: ['Noto Sans Variable', ...defaultTheme.fontFamily.sans],
-			serif: ['Zilla Slab', ...defaultTheme.fontFamily.serif],
+			sans: [sans, ...defaultTheme.fontFamily.sans],
+			serif: [serif, ...defaultTheme.fontFamily.serif],
 		},
 		extend: {
 			textColor: {
@@ -53,12 +56,12 @@ module.exports = {
 							},
 						},
 						'h1,h2,h3,h4,h5,h6': {
-							fontFamily: theme('fontFamily.serif'),
+							fontFamily: serif,
 							fontWeight: 500,
 						},
 						blockquote: {
 							border: 0,
-							fontFamily: theme('fontFamily.serif'),
+							fontFamily: serif,
 							fontSize: '1.3125em',
 							fontStyle: 'italic',
 							fontWeight: 'normal',
