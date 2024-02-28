@@ -6,38 +6,92 @@ import siteConfig from '../data/site-config'
 const hero = siteConfig.hero
 ---
 
-{
-	(hero?.title || hero?.image?.src || hero?.text || (hero?.actions && hero.actions.length > 0)) && (
-		<section class='w-full flex flex-col gap-8 mb-16 sm:mb-24'>
-			{hero.title && (
-				<h1 class='text-3xl leading-tight font-serif font-medium sm:text-5xl sm:leading-tight'>
-					{hero.title}
-				</h1>
-			)}
-			{hero.image?.src && (
-				<figure>
-					<img
-						class='w-full'
-						src={hero.image.src}
-						loading='lazy'
-						decoding='async'
-						alt={hero.image.alt || ''}
-					/>
-					{hero.image.caption && (
-						<figcaption class='mt-1.5 text-xs sm:text-sm'>{hero.image.caption}</figcaption>
-					)}
-				</figure>
-			)}
-			{hero.text && (
-				<div class='max-w-none prose prose-dante sm:prose-lg' set:html={marked.parse(hero.text)} />
-			)}
-			{hero.actions && hero.actions.length > 0 && (
-				<div class='flex flex-wrap gap-4'>
-					{hero.actions.map(action => (
-						<Button href={action.href}>{action.text}</Button>
-					))}
-				</div>
-			)}
-		</section>
-	)
-}
+<section class='w-full flex flex-col gap-8 mb-16 sm:mb-24'>
+	<div class='avatar'>
+		<img src='/avatar.webp' />
+	</div>
+	{hero.text && <div class='max-w-none prose prose-dante sm:prose-lg' set:html={marked.parse(hero.text)} />}
+	{
+		hero.actions && hero.actions.length > 0 && (
+			<div class='flex flex-wrap gap-4'>
+				{hero.actions.map(action => (
+					<Button href={action.href}>{action.text}</Button>
+				))}
+			</div>
+		)
+	}
+</section>
+
+<style>
+	.avatar {
+		height: 250px;
+		position: relative;
+		width: 250px;
+		margin: 0 auto;
+	}
+
+	.avatar img {
+		border-radius: 9999px;
+		height: 100%;
+		position: relative;
+		width: 100%;
+		z-index: 2;
+	}
+
+	@keyframes cycle-colors {
+		0% {
+			border-color: hsl(0, 100%, 50%);
+		}
+		25% {
+			border-color: hsl(90, 100%, 50%);
+		}
+		50% {
+			border-color: hsl(180, 100%, 50%);
+		}
+		75% {
+			border-color: hsl(270, 100%, 50%);
+		}
+		100% {
+			border-color: hsl(360, 100%, 50%);
+		}
+	}
+
+	@keyframes pulse {
+		to {
+			opacity: 0;
+			transform: scale(1);
+		}
+	}
+
+	.avatar::before,
+	.avatar::after {
+		animation: pulse 2s linear infinite;
+		border: #fff solid 8px;
+		border-radius: 9999px;
+		box-sizing: border-box;
+		content: ' ';
+		height: 140%;
+		left: -20%;
+		opacity: 0.6;
+		position: absolute;
+		top: -20%;
+		transform: scale(0.714);
+		width: 140%;
+		z-index: 1;
+	}
+
+	.avatar::after {
+		animation-delay: 1s;
+	}
+
+	.avatar:hover::before,
+	.avatar:hover::after {
+		animation:
+			pulse 1s linear infinite,
+			cycle-colors 6s linear infinite;
+	}
+
+	.avatar:hover::after {
+		animation-delay: 0.5s;
+	}
+</style>
