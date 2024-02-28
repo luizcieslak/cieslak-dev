@@ -31,8 +31,6 @@ type Props = {
 	nextPost: CollectionEntry<'blog'>
 }
 
-const { lang, slug } = Astro.params
-console.log('lang?', lang)
 const { href } = Astro.url
 const { post, prevPost, nextPost } = Astro.props
 const { title, publishDate, updatedDate, excerpt, tags = [], seo } = post.data
@@ -44,7 +42,6 @@ const { Content } = await post.render()
 	description={seo?.description ?? excerpt}
 	image={seo?.image}
 	pageType='article'
-	showHeader={false}
 >
 	<article class='mb-16 sm:mb-24'>
 		<header class='mb-8'>

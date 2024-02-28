@@ -19,11 +19,9 @@ export type Hero = {
 export type SiteConfig = {
 	logo?: Image
 	title: string
-	subtitle?: string
 	description: string
 	image?: Image
 	headerNavLinks?: Link[]
-	footerNavLinks?: Link[]
 	socialLinks?: Link[]
 	hero?: Hero
 	postsPerPage?: number
@@ -31,12 +29,11 @@ export type SiteConfig = {
 }
 
 const siteConfig: SiteConfig = {
-	title: 'Dante',
-	subtitle: 'Minimal Astro.js theme',
-	description: 'Astro.js and Tailwind CSS theme for blog and portfolio by justgoodui.com',
+	title: 'Cieslak.dev',
+	description: 'Luiz Cieslak website',
 	image: {
 		src: '/dante-preview.jpg',
-		alt: 'Dante - Astro.js and Tailwind CSS theme',
+		alt: 'Luiz Cieslak happily hugging an Android mascot.',
 	},
 	headerNavLinks: [
 		{
@@ -44,36 +41,18 @@ const siteConfig: SiteConfig = {
 			href: '/',
 		},
 	],
-	footerNavLinks: [
-		{
-			text: 'About',
-			href: '/about',
-		},
-		{
-			text: 'Contact',
-			href: '/contact',
-		},
-		{
-			text: 'Terms',
-			href: '/terms',
-		},
-		{
-			text: 'Download theme',
-			href: 'https://github.com/JustGoodUI/dante-astro-theme',
-		},
-	],
 	socialLinks: [
 		{
-			text: 'Dribbble',
-			href: 'https://dribbble.com/',
+			text: 'GitHub',
+			href: 'https://github.com/luizcieslak',
 		},
 		{
-			text: 'Instagram',
-			href: 'https://instagram.com/',
+			text: 'Linkedin',
+			href: 'https://www.linkedin.com/in/cieslakluiz/',
 		},
 		{
 			text: 'X/Twitter',
-			href: 'https://twitter.com/',
+			href: 'https://twitter.com/_luizcieslak',
 		},
 	],
 	hero: {
@@ -91,7 +70,6 @@ const siteConfig: SiteConfig = {
 		],
 	},
 	postsPerPage: 8,
-	projectsPerPage: 8,
 }
 
 export default siteConfig

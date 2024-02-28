@@ -16,10 +16,23 @@ export const ui = {
 		'nav.home': 'Home',
 		'nav.about': 'About',
 		'nav.twitter': 'Twitter',
+		'nav.contact': 'Contact',
 	},
 	'pt-br': {
 		'nav.home': 'Início',
 		'nav.about': 'Sobre',
+		'nav.contact': 'Contato',
 		// 'nav.twitter': 'Twitter',
 	},
 } as const
+
+export const routes = {
+	'pt-br': {
+		about: 'sobre',
+		contact: 'contato',
+	},
+	en: {
+		about: 'about',
+		contact: 'contact',
+	},
+}

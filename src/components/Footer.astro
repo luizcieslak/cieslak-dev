@@ -1,22 +1,23 @@
 ---
+import { getLangFromUrl, useTranslations, useTranslatedPath } from '../i18n/utils'
+const lang = getLangFromUrl(Astro.url)
+const t = useTranslations(lang)
+const translatePath = useTranslatedPath(lang)
+
 import siteConfig from '../data/site-config'
 
 const socialLinks = siteConfig.socialLinks || []
-const navLinks = siteConfig.footerNavLinks || []
 ---
 
 <footer class='w-full max-w-3xl mx-auto pt-12 pb-10 sm:pt-24 sm:pb-14'>
-	{
-		navLinks.length > 0 && (
-			<div class='mb-4 flex flex-wrap gap-x-6 gap-y-1'>
-				{navLinks.map(link => (
-					<a class='font-serif hover:underline hover:underline-offset-2' href={link.href}>
-						{link.text}
-					</a>
-				))}
-			</div>
-		)
-	}
+	<div class='mb-4 flex flex-wrap gap-x-6 gap-y-1'>
+		<a class='font-serif hover:underline hover:underline-offset-2' href={translatePath('about')}>
+			{t('nav.about')}
+		</a>
+		<a class='font-serif hover:underline hover:underline-offset-2' href={translatePath('contact')}>
+			{t('nav.contact')}
+		</a>
+	</div>
 	<div
 		class:list={[
 			'pt-6 flex flex-col gap-4 border-t border-dashed border-main',
