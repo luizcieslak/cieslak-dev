@@ -14,7 +14,10 @@ import LanguagePicker from '../components/LanguagePicker.astro'
 				<ul id='menu-items' class='menu flex gap-6'>
 					{navLinks.map(link => (
 						<li class='py-1'>
-							<NavLink class='text-xl lg:text-2xl font-serif text-main hover:opacity-80' href={link.href}>
+							<NavLink
+								class='text-2xl font-serif text-main hover:opacity-80 tracking-normal'
+								href={link.href}
+							>
 								{link.text}
 							</NavLink>
 						</li>
