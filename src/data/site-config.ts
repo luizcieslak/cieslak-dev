@@ -32,7 +32,7 @@ const siteConfig: SiteConfig = {
 	title: 'Cieslak.dev',
 	description: 'Luiz Cieslak website',
 	image: {
-		src: '/dante-preview.jpg',
+		src: '/cieslak-dev-preview.jpg',
 		alt: 'Luiz Cieslak happily hugging an Android mascot.',
 	},
 	headerNavLinks: [
