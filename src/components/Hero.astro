@@ -6,7 +6,7 @@ import siteConfig from '../data/site-config'
 const hero = siteConfig.hero
 ---
 
-<section class='w-full flex flex-col gap-8 mb-16 sm:mb-24'>
+<section class='w-full flex flex-col gap-8 mb-16 sm:mb-24 mt-8'>
 	<div class='avatar'>
 		<img src='/avatar.webp' />
 	</div>
@@ -66,7 +66,7 @@ const hero = siteConfig.hero
 	.avatar::before,
 	.avatar::after {
 		animation: pulse 2s linear infinite;
-		border: #fff solid 8px;
+		border: var(--color-text-main) solid 8px;
 		border-radius: 9999px;
 		box-sizing: border-box;
 		content: ' ';
