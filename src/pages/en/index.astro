@@ -15,7 +15,6 @@ const posts = (await getCollection('blog'))
 ---
 
 <BaseLayout description={siteConfig.description} image={siteConfig.image}>
-	english pls
 	<Hero />
 	{
 		posts?.length > 0 && (
@@ -24,9 +23,11 @@ const posts = (await getCollection('blog'))
 				{posts.map(post => (
 					<PostPreview post={post} class='mb-10 sm:mb-12' headingLevel='h3' />
 				))}
-				<div class='mt-12 sm:mt-16'>
-					<Button href='/blog'>View All Posts</Button>
-				</div>
+				{posts?.length > 2 && (
+					<div class='mt-12 sm:mt-16'>
+						<Button href='/blog'>View All Posts</Button>
+					</div>
+				)}
 			</div>
 		)
 	}
