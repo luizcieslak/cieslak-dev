@@ -1,0 +1,37 @@
+---
+import { marked } from 'marked'
+import Button from '../../components/Button.astro'
+import siteConfig from '../../data/site-config'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { CollectionEntry, getCollection } from 'astro:content'
+
+export async function getStaticPaths() {
+	const pages = await getCollection('pages')
+
+	return pages.map((page, index) => {
+		const [lang, ...slug] = page.slug.split('/')
+
+		return {
+			params: { slug: slug.join('/'), lang },
+			props: {
+				page,
+			},
+		}
+	})
+}
+
+type Props = {
+	page: CollectionEntry<'pages'>
+}
+
+const { page } = Astro.props
+const { Content } = await page.render()
+---
+
+<BaseLayout description={siteConfig.description} image={siteConfig.image}>
+	<section class='w-full flex flex-col gap-8 mb-16 sm:mb-24 mt-8'>
+		<div class='max-w-none prose prose-dante sm:prose-lg'>
+			<Content />
+		</div>
+	</section>
+</BaseLayout>
