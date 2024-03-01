@@ -1,9 +1,7 @@
 ---
-import { marked } from 'marked'
-import Button from '../../components/Button.astro'
 import siteConfig from '../../data/site-config'
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import { CollectionEntry, getCollection } from 'astro:content'
+import { type CollectionEntry, getCollection } from 'astro:content'
 
 export async function getStaticPaths() {
 	const pages = await getCollection('pages')
