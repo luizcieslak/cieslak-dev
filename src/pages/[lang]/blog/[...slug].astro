@@ -7,6 +7,10 @@ import PostPreview from '../../../components/PostPreview.astro'
 import { sortItemsByDateDesc } from '../../../utils/data-utils'
 import { slugify } from '../../../utils/common-utils'
 
+import { getLangFromUrl, useTranslations, useTranslatedPath } from '../../../i18n/utils'
+const lang = getLangFromUrl(Astro.url)
+const t = useTranslations(lang)
+
 export async function getStaticPaths() {
 	const posts = (await getCollection('blog')).sort(sortItemsByDateDesc)
 	const postCount = posts.length
@@ -53,7 +57,7 @@ const { Content } = await post.render()
 						<>
 							{' '}
 							<span>
-								(Updated on <FormattedDate date={updatedDate} />)
+								({t('blog.updatedon')} <FormattedDate date={updatedDate} />)
 							</span>
 						</>
 					)

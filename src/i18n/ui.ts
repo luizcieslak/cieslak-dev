@@ -17,11 +17,13 @@ export const ui = {
 		'nav.about': 'About',
 		'nav.twitter': 'Twitter',
 		'footer.footnote': 'All rights reserved.',
+		'blog.updatedon': 'Updated on',
 	},
 	'pt-br': {
 		'nav.home': 'Início',
 		'nav.about': 'Sobre',
 		'footer.footnote': 'Todos os direitos reservados.',
+		'blog.updatedon': 'Atualizado em',
 		// 'nav.twitter': 'Twitter',
 	},
 } as const
