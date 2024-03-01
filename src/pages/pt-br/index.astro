@@ -23,9 +23,11 @@ const posts = (await getCollection('blog'))
 				{posts.map(post => (
 					<PostPreview post={post} class='mb-10 sm:mb-12' headingLevel='h3' />
 				))}
-				<div class='mt-12 sm:mt-16'>
-					<Button href='/blog'>Ver todas as postagens</Button>
-				</div>
+				{posts?.length > 2 && (
+					<div class='mt-12 sm:mt-16'>
+						<Button href='/blog'>Ver todas as postagens</Button>
+					</div>
+				)}
 			</div>
 		)
 	}
