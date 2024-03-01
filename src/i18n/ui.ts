@@ -16,10 +16,12 @@ export const ui = {
 		'nav.home': 'Home',
 		'nav.about': 'About',
 		'nav.twitter': 'Twitter',
+		'footer.footnote': 'All rights reserved.',
 	},
 	'pt-br': {
 		'nav.home': 'Início',
 		'nav.about': 'Sobre',
+		'footer.footnote': 'Todos os direitos reservados.',
 		// 'nav.twitter': 'Twitter',
 	},
 } as const
