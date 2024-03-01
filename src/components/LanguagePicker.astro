@@ -1,6 +1,5 @@
 ---
 import { langPicker } from '../i18n/ui'
-console.log(Astro.currentLocale)
 const locale = Astro.currentLocale
 const pathname = Astro.url.pathname
 const origin = Astro.url.origin
@@ -11,7 +10,6 @@ const origin = Astro.url.origin
 		.filter(([lang, values]) => lang !== locale)
 		.map(([lang, { icon, label }]) => {
 			const [_trailingSlash, _oldLang, ...slug] = pathname.split('/')
-			console.log('alo', _trailingSlash, _oldLang, slug, lang)
 			return (
 				<a href={`${origin}/${lang}/${slug.join('/')}`} title={label}>
 					{icon}
