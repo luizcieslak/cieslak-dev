@@ -26,16 +26,6 @@ const TitleTag = headingLevel
 		</TitleTag>
 		<div class='mt-1 text-sm leading-normal'>
 			<FormattedDate date={publishDate} />
-			{
-				updatedDate && (
-					<>
-						{' '}
-						<span>
-							(Updated on <FormattedDate date={updatedDate} />)
-						</span>
-					</>
-				)
-			}
 		</div>
 		{excerpt && <div class='mt-3 text-sm leading-normal'>{excerpt}</div>}
 	</div>
