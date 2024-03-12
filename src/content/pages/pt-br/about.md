@@ -2,7 +2,7 @@
 title: About
 ---
 
-## Luiz Cieslak - Web Developer
+## Luiz Cieslak - Desenvolvedor Web
 
 **Salve!** Eu sou o Luiz Cieslak, um desenvolvedor web com 7+ anos de experiência. Atualmente moro na cidade de São Paulo, Brasil.
 
