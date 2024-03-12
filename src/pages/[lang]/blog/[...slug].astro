@@ -145,5 +145,18 @@ const { Content } = await post.render()
 			font-size: 1em;
 			text-wrap: balance;
 		} */
+
+		* {
+			text-wrap: balance;
+		}
+
+		details[open] {
+			background-color: var(--color-bg-muted);
+			summary {
+				font-weight: bold;
+			}
+
+			padding: 0 8px;
+		}
 	}
 </style>
