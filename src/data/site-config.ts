@@ -38,7 +38,7 @@ const siteConfig: SiteConfig = {
 	headerNavLinks: [
 		{
 			text: 'Cieslak.dev',
-			href: '/',
+			href: '',
 		},
 	],
 	socialLinks: [

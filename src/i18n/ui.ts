@@ -30,9 +30,9 @@ export const ui = {
 
 export const routes = {
 	'pt-br': {
-		about: 'sobre',
+		// about: 'sobre',
 	},
 	en: {
-		about: 'about',
+		// about: 'about',
 	},
 }
