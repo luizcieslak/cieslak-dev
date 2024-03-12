@@ -59,26 +59,26 @@ module.exports = {
 							fontFamily: serif,
 							fontWeight: 500,
 						},
-						blockquote: {
-							border: 0,
-							fontFamily: serif,
-							fontSize: '1.3125em',
-							fontStyle: 'italic',
-							fontWeight: 'normal',
-							lineHeight: 1.4,
-							paddingLeft: 0,
-							'@media (min-width: theme("screens.sm"))': {
-								fontSize: '1.66667em',
-								lineHeight: 1.3,
-							},
-						},
+						// blockquote: {
+						// 	border: 0,
+						// 	fontFamily: serif,
+						// 	fontSize: '1.3125em',
+						// 	fontStyle: 'italic',
+						// 	fontWeight: 'normal',
+						// 	lineHeight: 1.4,
+						// 	paddingLeft: 0,
+						// 	'@media (min-width: theme("screens.sm"))': {
+						// 		fontSize: '1.66667em',
+						// 		lineHeight: 1.3,
+						// 	},
+						// },
 					},
 				},
 				lg: {
 					css: {
-						blockquote: {
-							paddingLeft: 0,
-						},
+						// blockquote: {
+						// 	paddingLeft: 0,
+						// },
 					},
 				},
 			}),
