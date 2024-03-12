@@ -7,16 +7,21 @@ import { getLangFromUrl, useTranslations, useTranslatedPath } from '../i18n/util
 const lang = getLangFromUrl(Astro.url)
 const t = useTranslations(lang)
 
-type Props = { post: CollectionEntry<'blog'>; class?: string; headingLevel?: 'h2' | 'h3' }
+type Props = {
+	post: CollectionEntry<'blog'>
+	class?: string
+	headingLevel?: 'h2' | 'h3'
+	from: 'home' | 'blog'
+}
 
-const { post, class: className, headingLevel = 'h2' } = Astro.props
+const { post, class: className, headingLevel = 'h2', from = 'home' } = Astro.props
 const { title, publishDate, updatedDate, excerpt } = post.data
 const TitleTag = headingLevel
 ---
 
 <a
 	class:list={['flex justify-between items-start gap-8 group', className]}
-	href={`${post.slug.replace(lang, 'blog')}/`}
+	href={from === 'home' ? post.slug.replace(lang, 'blog') : post.slug.split('/')[1]}
 >
 	<div class='grow'>
 		<TitleTag

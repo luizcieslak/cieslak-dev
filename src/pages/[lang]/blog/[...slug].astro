@@ -1,29 +1,33 @@
 ---
 import { type CollectionEntry, getCollection } from 'astro:content'
 import BaseLayout from '../../../layouts/BaseLayout.astro'
-import Button from '../../../components/Button.astro'
 import FormattedDate from '../../../components/FormattedDate.astro'
 import PostPreview from '../../../components/PostPreview.astro'
 import { sortItemsByDateDesc } from '../../../utils/data-utils'
-import { slugify } from '../../../utils/common-utils'
+import { getLangFromUrl, useTranslations } from '../../../i18n/utils'
 
-import { getLangFromUrl, useTranslations, useTranslatedPath } from '../../../i18n/utils'
 const lang = getLangFromUrl(Astro.url)
 const t = useTranslations(lang)
 
 export async function getStaticPaths() {
 	const posts = (await getCollection('blog')).sort(sortItemsByDateDesc)
+
+	console.log('alo', Astro, posts)
+	// .filter(post => post.slug.includes(locale ?? ''))
 	const postCount = posts.length
 
 	return posts.map((post, index) => {
 		const [lang, ...slug] = post.slug.split('/')
 
+		const prevPost = posts.find((post, i) => i < index && post.id.startsWith(lang))
+		const nextPost = posts.find((post, i) => i > index && post.id.startsWith(lang))
+
 		return {
 			params: { slug: slug.join('/'), lang },
 			props: {
 				post,
-				prevPost: index + 1 !== postCount ? posts[index + 1] : null,
-				nextPost: index !== 0 ? posts[index - 1] : null,
+				prevPost,
+				nextPost,
 			},
 		}
 	})
@@ -35,9 +39,8 @@ type Props = {
 	nextPost: CollectionEntry<'blog'>
 }
 
-const { href } = Astro.url
 const { post, prevPost, nextPost } = Astro.props
-const { title, publishDate, updatedDate, excerpt, tags = [], seo } = post.data
+const { title, publishDate, updatedDate, excerpt, seo } = post.data
 const { Content } = await post.render()
 ---
 
@@ -90,15 +93,15 @@ const { Content } = await post.render()
 			</Button>
 		</div> -->
 	</article>
-	<!-- {
+	{
 		(prevPost || nextPost) && (
 			<div class='my-16 sm:my-24'>
 				<h2 class='mb-12 text-xl font-serif italic sm:mb-16 sm:text-2xl'>Read Next</h2>
-				{nextPost && <PostPreview post={nextPost} class='mb-10 sm:mb-12' headingLevel='h3' />}
-				{prevPost && <PostPreview post={prevPost} class='mb-10 sm:mb-12' headingLevel='h3' />}
+				{nextPost && <PostPreview post={nextPost} class='mb-10 sm:mb-12' headingLevel='h3' from='blog' />}
+				{prevPost && <PostPreview post={prevPost} class='mb-10 sm:mb-12' headingLevel='h3' from='blog' />}
 			</div>
 		)
-	} -->
+	}
 </BaseLayout>
 
 <script>
