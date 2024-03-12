@@ -21,7 +21,7 @@ const posts = (await getCollection('blog'))
 			<div class='mb-16 sm:mb-24'>
 				<h2 class='mb-12 text-xl font-serif italic sm:mb-16 sm:text-2xl'>Artigos</h2>
 				{posts.map(post => (
-					<PostPreview post={post} class='mb-10 sm:mb-12' headingLevel='h3' />
+					<PostPreview post={post} class='mb-10 sm:mb-12' headingLevel='h3' from='home' />
 				))}
 				{
 					// 	posts?.length > 2 && (
