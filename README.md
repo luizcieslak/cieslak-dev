@@ -6,4 +6,4 @@ Theme based on [Dante - Astro & Tailwind CSS Theme by justgoodui.com](https://gi
 
 ## License
 
-Licensed under the [GPL-3.0](https://github.com/cieslak-dev/blob/main/LICENSE) license.
+Licensed under the [GPL-3.0](https://github.com/luizcieslak/cieslak-dev/blob/main/LICENSE) license.
