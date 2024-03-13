@@ -12,10 +12,6 @@ const t = useTranslations(lang)
 export async function getStaticPaths() {
 	const posts = (await getCollection('blog')).sort(sortItemsByDateDesc)
 
-	console.log('alo', Astro, posts)
-	// .filter(post => post.slug.includes(locale ?? ''))
-	const postCount = posts.length
-
 	return posts.map((post, index) => {
 		const [lang, ...slug] = post.slug.split('/')
 
