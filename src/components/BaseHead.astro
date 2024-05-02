@@ -1,5 +1,6 @@
 ---
 import siteConfig from '../data/site-config'
+import { routes } from '../i18n/ui'
 import '../styles/global.css'
 
 export type Props = {
@@ -18,6 +19,18 @@ const resolvedImage = image?.src
 		}
 	: undefined
 const canonicalURL = new URL(Astro.request.url, Astro.site)
+
+function getLangAlternates(url: URL) {
+	const path = url.pathname
+	const langs = Object.keys(routes)
+
+	return langs.map(lang => {
+		const [_trailingSlash, _oldLang, ...slug] = path.split('/')
+		return lang !== _oldLang ? {url: `${url.origin}/${lang}/${slug.join('/')}`, hreflang: lang} : undefined
+	}).filter(Boolean)
+}
+
+console.log(getLangAlternates(canonicalURL))
 
 /**
  * Enforce some standard canonical URL formatting across the site.
@@ -47,6 +60,8 @@ function formatCanonicalURL(url: string | URL) {
 
 <!-- Page Metadata -->
 <link rel='canonical' href={formatCanonicalURL(canonicalURL)} />
+{getLangAlternates(canonicalURL).map(alt => <link rel='alternate' href={alt?.url} hreflang={alt?.hreflang}/>)}
+
 <meta name='description' content={description} />
 
 <!-- Open Graph / Facebook -->
