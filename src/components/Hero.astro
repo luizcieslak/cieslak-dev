@@ -8,7 +8,7 @@ const hero = siteConfig.hero
 
 <section class='w-full flex flex-col gap-8 mb-16 sm:mb-24 mt-8'>
 	<div class='avatar'>
-		<img src='/avatar.webp' />
+		<img src='/avatar.webp' alt="Luiz Cieslak Profile Picture" />
 	</div>
 	{hero.text && <div class='max-w-none prose prose-dante sm:prose-lg' set:html={marked.parse(hero.text)} />}
 	{
