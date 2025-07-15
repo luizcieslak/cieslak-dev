@@ -24,18 +24,52 @@ When it comes to predict the team advancement between stages in the championship
 
 ![Average team advancement prediction accuracy across all stages](/cs2-benchmark/accuracy-heatmap.png)
 
-When it comes to matches, `claude-opus-4` had the best accuracy and `sabia-3` as a close second. **Claude Opus 4 had a incredible accuracy of 100% on the last 2 stages**, even though the amount of matches that it predicted to happen was very low. **Sabia 3 on the other side had a very good accuracy of 78.6% on the first stage**, but a striking 0% accuracy on the last one.
-
-More on the In Depth Analysis section, but for matches **I've just considered the ones that happened in the real world.** CS2 Major Championship is done in a Swiss format which basically means the matchups are based on the previous round.
+When it comes to matches, `claude-sonnet-4` had the best accuracy: **18 matches predicted correctly** and `sabia-3` as a close second: **17 matches predicted correctly.**
 
 ![Average team advancement prediction accuracy across all stages](/cs2-benchmark/analysis-per-match-faceted.png)
 
+More on the In Depth Analysis section, but for matches **I've just considered the ones that happened in the real world.** CS2 Major Championship is done in a Swiss format which basically means the matchups of a round are defined based on the results of the previous round.
+
+# Code
+
+The code is full open source and available at [luizcieslak/cs2-match-prediction](https://github.com/luizcieslak/cs2-match-prediction).
+
+The main code is built using Node+TypeScript, the data scraping is using Playwright (actually Patchwright to bypass the anti-bot detection) and the analysis is done Python.
+
 # Prompt
+
+The prompt was the same as the one used in the previous post, but with a few tweaks:
+
+- Asked the LLM to try to predict the played maps and the picks/bans sequence.
+- Provide each active map stats in the prompt, so the LLM had the information about each team's performance in each map and in theory could predict the result with a higher accuracy.
+
+The prompt already had:
+
+- Summary of the last 5 articles about each team
+- Each team's overall statistics
+- Each team's world ranking number
+- Each team's past events history
+- Current championship context (current stage, amount of maps in the round, etc)
+
+Here's the full prompt example, in the match of Legacy vs Vitality:
+
+```text
+You are a CS2 match prediction AI.
+```
 
 # In Depth Analysis
 
 For the match prediction analysis, I've just considered the ones that happened in the real world. The [Valve Rulebook about Counter Strike championships](https://github.com/ValveSoftware/counter-strike_rules_and_regs/blob/main/major-supplemental-rulebook.md#mid-stage-seed-calculation) states that they are done in a Swiss Format with [Buccholz system](https://en.wikipedia.org/wiki/Buchholz_system). This means that the matchups for a round are defined based on the results of the previous round. Then you also have the **seeding** system, which determines which team in the matchup will have the highest seed and therefore have the first map pick/ban.
 
-Considering all the predictions were made before the championship even started, **it means that any wrong predicted match done in the first rounds would be carried until the end of the championship.** Therefore, I've filtered the matches that actually happened so we can understand how good a LLM is at predicting a match outcome.
+Considering all the predictions were made before the championship even started, **it means that any wrong predicted match done in the first rounds would be carried until the end of the championship.** Therefore, I've filtered the matches that actually happened so we can understand how good a LLM is at predicting a match outcome.?
+
+Now, let's check some outputs of how the LLMs built their responses.
+
+//add some outputs here from different models
+// perhaps discuss about the reasoning models? why did they not perform better?
 
 # Next Steps
+
+For a next analysis, I'd like to avoid run everything **before the championship started**, but rather execute the predictions **before each stage instead**. This would "reset" the predictions and allow the models to execute their analysis based on each stage individually.
+
+Perhaps it could be even more granular by **running the predictions of each round individually** on a daily basis, as the [original project this was forked from](https://github.com/stevekrenzel/pick-ems) is doing.
