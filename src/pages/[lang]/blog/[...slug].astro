@@ -157,5 +157,26 @@ const { Content } = await post.render()
 
 			padding: 0 8px;
 		}
+
+		:where(p code):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+			/* Remove the bold weight */
+			font-weight: normal;
+			/* Add background */
+			background-color: #fff1e7;
+			color: #e05f2d;
+			padding: 0.2em 0.4em;
+			border-radius: 4px;
+
+			html.dark & {
+				background-color: #2d1610;
+				color: #ff8f5e;
+			}
+
+			/* Remove the backticks */
+			&::before,
+			&::after {
+				display: none;
+			}
+		}
 	}
 </style>
