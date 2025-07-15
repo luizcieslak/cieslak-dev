@@ -20,11 +20,11 @@ All the predictions were run **before** the championship started at [May 30, 202
 
 # TL;DR
 
-When it comes to predict the team advancement between stages in the championship, **it did not have any improvements from the last experiment.** The best performant model was the `deepseek-chat` and `gpt-4.1`, which had a **58.3% avg accuracy**.
+When it comes to predict the team advancement between stages in the championship, **it did not have any improvements from the last experiment.** The best performant models were DeepSeek's `deepseek-chat` and OpenAI's `gpt-4.1`, which had a **58.3% avg accuracy** each.
 
 ![Average team advancement prediction accuracy across all stages](/cs2-benchmark/accuracy-heatmap.png)
 
-When it comes to matches, `claude-sonnet-4` had the best accuracy: **18 matches predicted correctly** and `sabia-3` as a close second: **17 matches predicted correctly.**
+When it comes to matches, Anthropic's `claude-sonnet-4` had the best accuracy: **18 matches predicted correctly** and MaritacaAI's `sabia-3` was a close second: **17 matches predicted correctly.**
 
 ![Average team advancement prediction accuracy across all stages](/cs2-benchmark/analysis-per-match-faceted.png)
 
@@ -32,9 +32,9 @@ More on the In Depth Analysis section, but for matches **I've just considered th
 
 # Code
 
-The code is full open source and available at [luizcieslak/cs2-match-prediction](https://github.com/luizcieslak/cs2-match-prediction).
+The code is open source and available at [luizcieslak/cs2-match-prediction](https://github.com/luizcieslak/cs2-match-prediction).
 
-The main code is built using Node+TypeScript, the data scraping is using Playwright (actually Patchwright to bypass the anti-bot detection) and the analysis is done Python.
+The main code is built using Node+TypeScript, the data scraping is using Playwright (actually [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-nodejs) to bypass the anti-bot detection) and the analysis/charts are done via Python on Jupyter Notebooks.
 
 # Prompt
 
@@ -65,11 +65,17 @@ Considering all the predictions were made before the championship even started, 
 
 Now, let's check some outputs of how the LLMs built their responses.
 
+## Predictions
+
+## Reasoning models
+
+## It is a feature, not a bug
+
 //add some outputs here from different models
 // perhaps discuss about the reasoning models? why did they not perform better?
 
 # Next Steps
 
-For a next analysis, I'd like to avoid run everything **before the championship started**, but rather execute the predictions **before each stage instead**. This would "reset" the predictions and allow the models to execute their analysis based on each stage individually.
+For a next analysis, I'd like to avoid run everything **before the championship starts**, but rather execute the predictions **before each stage instead**. This would "reset" the predictions and allow the models to execute their analysis based on each stage individually.
 
 Perhaps it could be even more granular by **running the predictions of each round individually** on a daily basis, as the [original project this was forked from](https://github.com/stevekrenzel/pick-ems) is doing.
