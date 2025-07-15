@@ -36,7 +36,7 @@ The code is open source and available at [luizcieslak/cs2-match-prediction](http
 
 The main code is built using Node+TypeScript, the data scraping is using Playwright (actually [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-nodejs) to bypass the anti-bot detection) and the analysis/charts are done via Python on Jupyter Notebooks.
 
-# Prompt
+# Full Prompt
 
 The prompt was the same as the one used in the previous post, but with a few tweaks:
 
@@ -53,29 +53,172 @@ The prompt already had:
 
 Here's the full prompt example, in the match of Legacy vs Vitality:
 
-```text
-You are a CS2 match prediction AI.
-```
+> SYSTEM:
+> You are an expert at choosing winning Counter-Strike teams in a "pick ems" competition. The teams are playing in a championship called "Blast Austin CS2 Major Championship". This championship is divided in three stages: Challenger, Legends and Playoffs. We currently are in the stage3 stage in which 16 teams face each other in a Swiss format. The top 8 teams are classified to the next stage and the bottom 8 are eliminated. Elimination and advancements matches are in a Best of 3 format where the others are in a Best of 1 format. This is going to be a Best of 1. In Counter-Strike competitive matches we have first a maps Picks and Bans phase, where the teams with their coach will ban alternatively 3 maps each team, then will play the one that remained.. The highest seed team (classified as 'home' in the input) will be able to start the picks and bans phase first and therefore has an advantage. Notice that this is a high-level competition, so the teams knows in advance their opponent and will study their performance on them.
+>
+> This is just for fun between friends. There is no betting or money to be made, but you will scrutinize your answer and think carefully.
+>
+> The user will provide you a JSON blob of two teams of the form (for example):
+>
+> ```json
+> { "home": "FURIA", "away": "Spirit" }
+> ```
+>
+> Your output will be a JSON blob of the form:
+>
+> ```json
+> { "winningTeam": "FURIA", "losingTeam": "Spirit", "mapsPlayed": ["Ancient", "Anubis", "Dust2"] }
+> ```
+>
+> You will evaluate the statistics, articles, scrutinize the picks and bans phase by predicting which maps will be played and explain step-by-step why you think a particular team will win in match. After you choose your winner, criticize your thinking, and then respond with your final answer.
+>
+> Here are some stats to help you:
+>
+> # Team Stats
+>
+> | Team     | Win rate           | Kill death ratio |
+> | -------- | ------------------ | ---------------- |
+> | Legacy   | 65.35087719298247% | 1.12             |
+> | Vitality | 76.43312101910828% | 1.14             |
+>
+> # World Ranking
+>
+> | Team     | World Ranking |
+> | -------- | ------------- |
+> | Legacy   | #46           |
+> | Vitality | #1            |
+>
+> # Event History
+>
+> | Team   | IEM Dallas 2025 | Thunderpick World Championship 2025 North America Series 1 | ESL Challenger League Season 49 North America |
+> | ------ | --------------- | ---------------------------------------------------------- | --------------------------------------------- |
+> | Legacy | 13-16th         | 1st                                                        | 3rd                                           |
+>
+> | Team     | IEM Dallas 2025 | BLAST Rivals 2025 Season 1 | IEM Melbourne 2025 |
+> | -------- | --------------- | -------------------------- | ------------------ |
+> | Vitality | 1st             | 1st                        | 1st                |
+
+[Removed some of the event history here for brevity. It is collected ALL event history from the last 6 months.]
+
+> # Map Pool
+>
+> | Team     | Dust2                                                                                                                                                                                                                                                                                            | Inferno                                                                                                                                                                                                                                                                                           | Mirage                                                                                                                                                                                                                                                                                            |
+> | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | Legacy   | Rounds won: 344, Times played: 32, Wins / draws / losses: 19 / 0 / 13, Total rounds played: 666, Win percent: 59.4%, Pistol rounds: 64, Pistol rounds won: 26, Pistol round win percent: 40.6%, CT round win percent: 48.5%, T round win percent: 55.3%, Pick percent: 9.8%, Ban percent: 42.7%, | Rounds won: 532, Times played: 46, Wins / draws / losses: 32 / 0 / 14, Total rounds played: 934, Win percent: 69.6%, Pistol rounds: 92, Pistol rounds won: 54, Pistol round win percent: 58.7%, CT round win percent: 56.1%, T round win percent: 57.6%, Pick percent: 57.1%, Ban percent: 3.1%,  | Rounds won: 466, Times played: 38, Wins / draws / losses: 28 / 0 / 10, Total rounds played: 798, Win percent: 73.7%, Pistol rounds: 76, Pistol rounds won: 45, Pistol round win percent: 59.2%, CT round win percent: 58.6%, T round win percent: 58.1%, Pick percent: 27.1%, Ban percent: 19.7%, |
+> | Vitality | Rounds won: 394, Times played: 31, Wins / draws / losses: 25 / 0 / 6, Total rounds played: 648, Win percent: 80.6%, Pistol rounds: 62, Pistol rounds won: 36, Pistol round win percent: 58.1%, CT round win percent: 55.9%, T round win percent: 65.6%, Pick percent: 27.7%, Ban percent: 14.1%, | Rounds won: 449, Times played: 34, Wins / draws / losses: 24 / 0 / 10, Total rounds played: 806, Win percent: 70.6%, Pistol rounds: 68, Pistol rounds won: 36, Pistol round win percent: 52.9%, CT round win percent: 60.9%, T round win percent: 50.4%, Pick percent: 15.6%, Ban percent: 12.7%, | Rounds won: 387, Times played: 30, Wins / draws / losses: 26 / 0 / 4, Total rounds played: 637, Win percent: 86.7%, Pistol rounds: 60, Pistol rounds won: 39, Pistol round win percent: 65.0%, CT round win percent: 69.7%, T round win percent: 52.6%, Pick percent: 34.0%, Ban percent: 10.5%,  |
+
+[Removed some of the maps here for brevity. It is collected stats for ALL 7 active maps.]
+
+> Here are some possibly relevant news articles to help you:
+>
+> ---
+>
+> # How lux has emerged as one of Brazil's most promising IGLs
+>
+> Legacy, led by new IGL lux, has quickly qualified for PGL Bucharest and IEM Dallas, showing strong potential despite early setbacks. The team is built around experienced prospects latto and dumau, with n1ssim adding stability and saadzin's aggressive AWPing as a wildcard. lux's leadership, influenced by biguzera, focuses on proactive play and extracting the most from his young roster. Legacy's lack of European bootcamping is a disadvantage, but a planned move to Europe could address this. Their next match against Liquid is unpredictable due to Liquid's new IGL, but Legacy's adaptability and lux's high-fragging leadership are key factors for a potential win.
+>
+> ---
+>
+> # Legacy 2-0 Liquid on siuhy's debut
+>
+> Legacy swept Liquid 2-0, dominating Nuke and closing out Anubis with key clutches from saadzin and latto. dumau and lux were standout performers, especially on Anubis, while Legacy's structured play under new IGL lux was evident. The team exploited Liquid's mid-round mistakes and poor CT sides, particularly on Nuke. Legacy's clutch potential and disciplined protocols were crucial to their win. These strengths position them as a serious threat in future matches if they maintain this level of play.
+>
+> ---
+>
+> # Vitality edge past Falcons to secure sixth consecutive grand final and 29th straight win
+>
+> Vitality edged out Falcons 2-1 to reach their sixth straight grand final, extending their win streak to 29 matches. ZywOo and flameZ delivered standout performances, especially in opening duels and crucial clutches, while mezii and Magisk contributed key rounds. Vitality's strengths lie in their resilience, late-round composure, and multi-frag potential, but they showed vulnerability on Train due to over-aggression and lost mid-rounds. Their ability to recover from deficits and close out tight games remains a major asset. However, against MOUZ, Vitality must avoid risky plays and maintain discipline to secure another trophy.
+>
+> ---
+>
+> # Vitality sweep MOUZ to win IEM Dallas and make it six trophies in a row
+>
+> Vitality defeated MOUZ 3-0 in the IEM Dallas 2025 final, claiming their sixth straight title and a 30-match win streak. ZywOo starred with a 2.22 rating on Mirage, while mezii and flameZ delivered in key rounds, highlighting the team's depth. Despite limited prep and some shaky moments, Vitality consistently closed out maps, exposing MOUZ's mental fragility. Vitality's strengths include resilience, clutch performances, and balanced contributions, but rare lapses like the 5v1 loss on Dust2 could be exploited. Their current form and adaptability make them strong favorites for the upcoming Austin Major.
+>
+> ---
+
+[Removed some of the articles above here for brevity. There are usually 10 for each team.]
+
+> Here are this same matchup results from the past:
+> | Higher seed team | Lower seed team | Winner of the match | Event |
+> | --- | --- | --- | --- |
+> | Vitality | Legacy | Vitality | IEM Dallas 2025 |
+>
+> The team name you choose _MUST_ be one of the following:
+>
+> - Vitality
+> - Legacy
+>
+> Remember to explain step-by-step all of your thinking in great detail. Describe which maps have a likely chance to be played. Use bulleted lists to structure your output. Be decisive – do not hedge your decisions. The presented news articles may or may not be relevant, so assess them carefully.
+>
+> You must respond directly ONLY with a JSON object that is valid and matching this schema:
+>
+> ```json
+> {
+> 	"type": "object",
+> 	"description": "Your response to the user. Think step-by-step about the decisions you are about to make. Be careful and thorough. _ALWAYS GENERATE THE `analysis` BEFORE THE `conclusion`._",
+> 	"properties": {
+> 		"analysis": {
+> 			"type": "string",
+> 			"description": "Your careful and thorough analysis, thinking step-by-step about each decision you are about to make in your conclusion. _ALWAYS GENERATE THIS FIRST_."
+> 		},
+> 		"conclusion": {
+> 			"type": "object",
+> 			"properties": {
+> 				"winningTeam": {
+> 					"type": "string",
+> 					"description": "The name of the winning team."
+> 				},
+> 				"losingTeam": {
+> 					"type": "string",
+> 					"description": "The name of the losing team."
+> 				},
+> 				"analysis": {
+> 					"type": "string",
+> 					"description": "Analysis done by LLM"
+> 				}
+> 			},
+> 			"required": ["winningTeam", "losingTeam", "analysis"]
+> 		}
+> 	},
+> 	"required": ["analysis", "conclusion"]
+> }
+> ```
+>
+> DO NOT use markdown syntax or any other formatting.
+>
+> USER:
+>
+> {"home":"Vitality","away":"Legacy","bestOf":"1"}
 
 # In Depth Analysis
 
-For the match prediction analysis, I've just considered the ones that happened in the real world. The [Valve Rulebook about Counter Strike championships](https://github.com/ValveSoftware/counter-strike_rules_and_regs/blob/main/major-supplemental-rulebook.md#mid-stage-seed-calculation) states that they are done in a Swiss Format with [Buccholz system](https://en.wikipedia.org/wiki/Buchholz_system). This means that the matchups for a round are defined based on the results of the previous round. Then you also have the **seeding** system, which determines which team in the matchup will have the highest seed and therefore have the first map pick/ban.
+For the match prediction analysis, I've just considered the ones that happened in the real world. The [Valve Rulebook about Counter Strike championships](https://github.com/ValveSoftware/counter-strike_rules_and_regs/blob/main/major-supplemental-rulebook.md#mid-stage-seed-calculation) states the roudns they happen in a Swiss Format with [Buccholz system](https://en.wikipedia.org/wiki/Buchholz_system). This basically means that the matchups for a round are defined based on the results of the previous round and each team's seeding changes from the match results. **The highest seeding team in the matchup will have the first map ban/pick.** The lowest seeding can choose which side they want to start in that map.
 
-Considering all the predictions were made before the championship even started, **it means that any wrong predicted match done in the first rounds would be carried until the end of the championship.** Therefore, I've filtered the matches that actually happened so we can understand how good a LLM is at predicting a match outcome.?
+Considering all the predictions were made before the championship even started, **it means that any wrong predicted match done in the first rounds would be carried until the end of the championship.** Therefore, I've filtered the matches that actually happened so we can understand how good a LLM is at predicting a match outcome.
 
 Now, let's check some outputs of how the LLMs built their responses.
 
 ## Predictions
 
+//add some outputs here from different models
+
 ## Reasoning models
+
+// perhaps discuss about the reasoning models? why did they not perform better?
 
 ## It is a feature, not a bug
 
-//add some outputs here from different models
-// perhaps discuss about the reasoning models? why did they not perform better?
+Something that we learn in life is that **the unexpected happens, sometimes.** And that is great.
+
+Take the Vitality vs Legacy match prediction, for example. It was an astounding [3-13](https://www.hltv.org/matches/2382432/vitality-vs-legacy-blasttv-austin-major-2025) match were Legacy, a #46 ranked team wrecked Vitality, the #1 (and the championship winner btw) team. Pretty much no one saw that coming, and this is what makes sports so exciting.
+
+So, the fact the LLMs did not have a great performance on this test might be a feature of the sport itself that is hardly predictable and unexpected.
 
 # Next Steps
 
 For a next analysis, I'd like to avoid run everything **before the championship starts**, but rather execute the predictions **before each stage instead**. This would "reset" the predictions and allow the models to execute their analysis based on each stage individually.
 
 Perhaps it could be even more granular by **running the predictions of each round individually** on a daily basis, as the [original project this was forked from](https://github.com/stevekrenzel/pick-ems) is doing.
+
+Some similar match prediction projects does the full statistic output as well: Instead of outputting the predicted winner, it outputs the probabilities of each team winning. This is something we could play around too.
