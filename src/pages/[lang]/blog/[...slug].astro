@@ -52,7 +52,7 @@ const { Content } = await post.render()
 			<div class='mt-4 text-sm'>
 				<FormattedDate date={publishDate} />
 				{
-					updatedDate && (
+					updatedDate && publishDate.toISOString() !== updatedDate.toISOString() && (
 						<>
 							{' '}
 							<span>
