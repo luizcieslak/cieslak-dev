@@ -1,56 +1,58 @@
 ---
-title: CS2 Match Prediction with AI Multi-Model comparison
-excerpt: This is a benchmark of different LLM models that predict matches of Counter-Strike 2 in the 2025 Austin Major Championship.
+title: Previsão de Resultados de CS2 - Análise Comparativa de Modelos de IA
+exceprt: Um Benchmark de diferentes modelos de IA que preveem partidas de Counter-Strike 2 no Major de Austin em 2025.
 publishDate: '2025-07-17'
 updatedDate: '2025-07-17'
 seo:
   image:
     src: '/cs2-benchmark/overall-performance.png'
-    alt: Average team advancement prediction accuracy across all stages
+    alt: Média da precisão no avanço de equipes entre as fases do campeonato
 ---
 
-![Average team advancement prediction accuracy across all stages](/cs2-benchmark/overall-performance.png)
+![Média da precisão no avanço de equipes entre as fases do campeonato](/cs2-benchmark/overall-performance.png)
 
-In 2024, I wrote a [blog post](https://cieslak.dev/en/blog/2024-03-13-cs2-ai) about predicting Counter-Strike 2 matches inside a Major Championship context using OpenAI's GPT4 model.
+Em 2024, escrevi um [post](https://cieslak.dev/en/blog/2024-03-13-cs2-ai) sobre a previsão de partidas de Counter-Strike 2 dentro de um contexto do Major usando o modelo GPT4 da OpenAI.
 
-In this post, I'm expanding the experiment by doing a benchmark of different LLM models with the same purpose.
+Nesse novo post, expandi o experimento para fazer um _benchmark_ entre diferentes modelos de IA com o mesmo objetivo, a fim de entender qual deles é melhor para esse tipo de tarefa.
 
-# TL;DR
+# Resumo
 
-All the predictions were run **before** the championship started at [May 30, 2025](https://github.com/luizcieslak/cs2-match-prediction/commit/56a583b3965551e385be143f4206a479307da49f)
+Todas as previsões foram feitas **antes** do início do campeonato, em [30 de maio de 2025](https://github.com/luizcieslak/cs2-match-prediction/commit/56a583b3965551e385be143f4206a479307da49f).
 
-When it comes to predicting the team advancement between stages in the championship, **there were no improvements from the last experiment.** The best performant models were DeepSeek's `deepseek-chat` and OpenAI's `gpt-4.1`, which had a **58.3% avg accuracy** each.
+Quando se trata de prever o avanço das equipes entre as fases do campeonato, **não houve melhorias em relação ao último experimento.** Os modelos com melhor desempenho foram o `deepseek-chat` da DeepSeek e o `gpt-4.1` da OpenAI, que tiveram uma **precisão média de 58,3%** cada.
 
-![Average team advancement prediction accuracy across all stages](/cs2-benchmark/accuracy-heatmap.png)
+![Precisão média da previsão do avanço das equipes em todas as fases](/cs2-benchmark/accuracy-heatmap.png)
 
-When it comes to matches, Anthropic's `claude-sonnet-4` had the best accuracy: **18 matches predicted correctly** and MaritacaAI's `sabia-3` was a close second: **17 matches predicted correctly.**
+Quando se trata de partidas individuais, o `claude-sonnet-4` da Anthropic teve a melhor precisão: **18 partidas previstas corretamente**, e o `sabia-3` da MaritacaAI ficou em segundo lugar: **17 partidas previstas corretamente.**
 
-![Average team advancement prediction accuracy across all stages](/cs2-benchmark/analysis-per-match-faceted.png)
+![Precisão média da previsão do avanço das equipes em todas as fases](/cs2-benchmark/analysis-per-match-faceted.png)
 
-More on the [In Depth Analysis](#in-depth-analysis) section, but for matches **I've just considered the ones that happened in the real world.** CS2 Major Championship is done in a Swiss format which basically means the matchups of a round are defined based on the results of the previous round.
+Elaboro mais na seção [Análise aprofundada](#in-depth-analysis), mas para as partidas **eu considerei apenas as que aconteceram no mundo real.** O CS2 Major Championship é realizado no formato suíço, o que basicamente significa que os confrontos de uma rodada são definidos com base nos resultados da rodada anterior.
 
 # Code
 
 The code is open source and available at [luizcieslak/cs2-match-prediction](https://github.com/luizcieslak/cs2-match-prediction).
 
-The main code is built using Node+TypeScript, the data scraping is using Playwright (actually [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-nodejs) to bypass the anti-bot detection) and the analysis/charts are done using Python in Jupyter Notebooks.
+O código de _open-source_ está disponível em [luizcieslak/cs2-match-prediction](https://github.com/luizcieslak/cs2-match-prediction).
 
-# Full Prompt
+É uma aplicação Node usando TypeScript, a extração de dados é feita usando o Playwright (nd verdade [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-nodejs) para passar da detecção de bots) e a análise/gráficos são feitas usando Python em Jupyter Notebooks.
 
-The prompt remained similar to the one used in the previous post, with a few tweaks:
+# Prompt Completo
 
-- Added a new statistic about each team's performance in all maps.
-- Try to predict what would be the played maps and the map picks/bans sequence so then, in theory, it could predict the result with a higher accuracy.
+O prompt permaneceu semelhante ao usado na postagem anterior, com algumas alterações:
 
-The prompt already had:
+- Adicionado uma nova estatística do desempenho dos times em cada mapa.
+- Tentar prever quais seriam os mapas jogados e a sequência de _picks/bans_ e, em teoria, poder prever o resultado com maior precisão.
 
-- Summary of the last 10 articles about each team
-- Each team's overall statistics
-- Each team's world ranking position
-- Each team's past events history
-- Current championship context (current stage, amount of games already played, etc)
+O prompt já tinha:
 
-Here's the full prompt example, in the match of Legacy vs Vitality:
+- Resumo dos últimos 10 artigos sobre cada equipe
+- Estatísticas gerais de cada equipe
+- Posição do ranking mundial de cada equipe
+- Histórico de eventos passados de cada equipe
+- Contexto atual do campeonato (fase atual, quantidade de jogos já feitos, etc.)
+
+Aqui está o exemplo completo do prompt, na partida entre Legacy e Vitality (em inglês):
 
 > SYSTEM:
 > You are an expert at choosing winning Counter-Strike teams in a "pick ems" competition. The teams are playing in a championship called "Blast Austin CS2 Major Championship". This championship is divided in four stages: Stage 1, Stage2, Stage 3 and Playoffs. We currently are in the stage3 stage in which 16 teams face each other in a Swiss format. The top 8 teams are classified to the next stage and the bottom 8 are eliminated. Elimination and advancements matches are in a Best of 3 format where the others are in a Best of 1 format. This is going to be a Best of 1 match.
@@ -99,7 +101,7 @@ Here's the full prompt example, in the match of Legacy vs Vitality:
 > | -------- | --------------- | -------------------------- | ------------------ |
 > | Vitality | 1st             | 1st                        | 1st                |
 
-[Removed some of the event history here for brevity. It is collected ALL event history from the last 6 months.]
+[Removi parte das estatísticas de eventos aqui para não ficar longo. É fornecido TODO o histórico de eventos dos últimos 6 meses.]
 
 > # Map Pool
 >
@@ -108,7 +110,7 @@ Here's the full prompt example, in the match of Legacy vs Vitality:
 > | Legacy   | Rounds won: 344, Times played: 32, Wins / draws / losses: 19 / 0 / 13, Total rounds played: 666, Win percent: 59.4%, Pistol rounds: 64, Pistol rounds won: 26, Pistol round win percent: 40.6%, CT round win percent: 48.5%, T round win percent: 55.3%, Pick percent: 9.8%, Ban percent: 42.7%, | Rounds won: 532, Times played: 46, Wins / draws / losses: 32 / 0 / 14, Total rounds played: 934, Win percent: 69.6%, Pistol rounds: 92, Pistol rounds won: 54, Pistol round win percent: 58.7%, CT round win percent: 56.1%, T round win percent: 57.6%, Pick percent: 57.1%, Ban percent: 3.1%,  | Rounds won: 466, Times played: 38, Wins / draws / losses: 28 / 0 / 10, Total rounds played: 798, Win percent: 73.7%, Pistol rounds: 76, Pistol rounds won: 45, Pistol round win percent: 59.2%, CT round win percent: 58.6%, T round win percent: 58.1%, Pick percent: 27.1%, Ban percent: 19.7%, |
 > | Vitality | Rounds won: 394, Times played: 31, Wins / draws / losses: 25 / 0 / 6, Total rounds played: 648, Win percent: 80.6%, Pistol rounds: 62, Pistol rounds won: 36, Pistol round win percent: 58.1%, CT round win percent: 55.9%, T round win percent: 65.6%, Pick percent: 27.7%, Ban percent: 14.1%, | Rounds won: 449, Times played: 34, Wins / draws / losses: 24 / 0 / 10, Total rounds played: 806, Win percent: 70.6%, Pistol rounds: 68, Pistol rounds won: 36, Pistol round win percent: 52.9%, CT round win percent: 60.9%, T round win percent: 50.4%, Pick percent: 15.6%, Ban percent: 12.7%, | Rounds won: 387, Times played: 30, Wins / draws / losses: 26 / 0 / 4, Total rounds played: 637, Win percent: 86.7%, Pistol rounds: 60, Pistol rounds won: 39, Pistol round win percent: 65.0%, CT round win percent: 69.7%, T round win percent: 52.6%, Pick percent: 34.0%, Ban percent: 10.5%,  |
 
-[Removed some of the maps here for brevity. It is collected stats for ALL 7 active maps.]
+[Removi alguns mapas aqui para ficar curto. É fornecido estatísticas para TODOS os 7 mapas ativos.]
 
 > Here are some possibly relevant news articles to help you:
 >
@@ -138,7 +140,7 @@ Here's the full prompt example, in the match of Legacy vs Vitality:
 >
 > ---
 
-[Removed some of the articles above here for brevity. There are usually 10 for each team.]
+[Removi a maioria dos artigos aqui para ficar curto. Normalmente há 10 para cada time.]
 
 > Here are this same matchup results from the past:
 > | Higher seed team | Lower seed team | Winner of the match | Event |
@@ -192,19 +194,19 @@ Here's the full prompt example, in the match of Legacy vs Vitality:
 >
 > {"home":"Vitality","away":"Legacy","bestOf":"1"}
 
-# In Depth Analysis
+# Análise aprofundada
 
-For the match prediction analysis, **I only considered the ones that happened in the real world**. The [Valve Rulebook about Counter Strike championships](https://github.com/ValveSoftware/counter-strike_rules_and_regs/blob/main/major-supplemental-rulebook.md#mid-stage-seed-calculation) states the rounds they happen in a Swiss Format with [Buccholz system](https://en.wikipedia.org/wiki/Buchholz_system).
+Para a análise de jogos individuais, **considerei apenas aqueles que ocorreram no mundo real**. O [Regulamento da Valve sobre os campeonatos de Counter Strike](https://github.com/ValveSoftware/counter-strike_rules_and_regs/blob/main/major-supplemental-rulebook.md#mid-stage-seed-calculation) estabelece que as rodadas ocorrem no formato suíço com o [sistema Buccholz](https://en.wikipedia.org/wiki/Buchholz_system).
 
-Under this format, **the matchups for a round are defined based on the results of the previous round** and each team's seeding changes from the match results. **The highest seeding team in the matchup will have the first map ban/pick.** The lowest seeding can choose which side they want to start in that map.
+Nesse formato, **os confrontos de uma rodada são definidos com base nos resultados da rodada anterior** e a classificação (chamado de _seed_ em inglês) de cada equipe muda de acordo com os resultados das partidas. **A equipe com o maior _seed_ no confronto terá a primeiro pick/ban de mapa.** O _seed_ mais baixo portanto pode escolher de que lado quer começar o jogo nesse mapa.
 
-Considering all the predictions were made before the championship even started, **it means that any incorrectly predicted match in the first round would be carried until the end of the championship.** Therefore, I've filtered the matches that actually happened so we can understand how good a LLM is at predicting a match outcome.
+Considerando que todas as previsões foram feitas antes mesmo do início do campeonato, **isso significa que qualquer partida prevista incorretamente na primeira rodada será mantida até o final do campeonato.** Então, filtrei as partidas que realmente aconteceram para que possamos entender o quão bom um LLM é em prever o resultado de uma partida isolada.
 
-In the below section, I'll show some outputs of how the LLMs built their responses.
+Agora, coloco aqui abaixo alguns resultados de como as LLMs construíram suas respostas.
 
-## LLMs analysis
+## Análise das LLMs
 
-Taking the [Lynn Vision vs Legacy match happened on the first round of the first stage](https://www.hltv.org/matches/2382301/lynn-vision-vs-legacy-blasttv-austin-major-2025-stage-1), where Lynn Vision won 13-7, this is the analysis by DeepSeek's `deepseek-chat` model:
+Considerando a partida entre Lynn Vision e Legacy que aconteceu na primeira rodada da primeira fase (https://www.hltv.org/matches/2382301/lynn-vision-vs-legacy-blasttv-austin-major-2025-stage-1), em que Lynn Vision venceu por 13 a 7, esta é a análise do modelo `deepseek-chat` da DeepSeek (em inglês):
 
 > ## CSGO Match Analysis by deepseek-chat: Lynn Vision vs Legacy
 >
@@ -252,9 +254,11 @@ Taking the [Lynn Vision vs Legacy match happened on the first round of the first
 > - Legacy's higher win rate and K/D ratio suggest they are in good form, but their map pool may be exploited by Lynn Vision's bans.
 > - Lynn Vision's recent roster changes, including the addition of C4LLM3SU3 and the return of Starry, have improved their firepower and synergy.
 
-It was the only model able to predict the winner on this match but it was unable to predict the correct map: it was actually a Dust2, which was a strong map in the whole championship for Lynn Vision.
+Esse foi o único modelo capaz de prever corretamente o vencedor nessa partida. Porém, não preveu o mapa que foi jogado: Na verdade, foi uma Dust2, que inclusive foi um mapa forte no campeonato inteiro para a Lynn Vision.
 
 Now, let's see the analysis of a Best Of 3 match between [MOUZ and Vitality](https://www.hltv.org/matches/2382618/mouz-vs-vitality-blasttv-austin-major-2025) on the Playoffs stage, where Vitality won 2-1. This was from Anthropic's `claude-opus-4`, a **reasoning model.**
+
+Agora, vamos ver a análise de uma partida entre [MOUZ e Vitality](https://www.hltv.org/matches/2382618/mouz-vs-vitality-blasttv-austin-major-2025) na fase Playoffs, onde Vitality venceu por 2-1. Essa análise é feita pelo modelo `claude-opus-4` da Anthropic, que é um **modelo de _reasoning_** (em inglês).
 
 > ## CSGO Match Analysis: Vitality vs MOUZ
 >
@@ -338,13 +342,13 @@ Now, let's see the analysis of a Best Of 3 match between [MOUZ and Vitality](htt
 >
 > Given all these factors, Vitality's dominance over MOUZ is clear and consistent.
 
-It could nail 2 of the 3 maps (Inferno and Train) and predict the winner.
+Ele conseguiu acertar 2 dos 3 mapas (Inferno e Train) e prever o vencedor.
 
-## Reasoning models
+## Modelos de raciocínio
 
-On this analysis, the **reasoning models performed worse then the other models.** I could not find the reason why, but it was a surprise to me.
+Nesta análise, os **modelos de raciocínio (_reasoning_) tiveram um desempenho pior do que os outros modelos.** Não consegui descobrir o motivo, mas foi uma surpresa para mim.
 
-**The prompt is exactly the same to all models regardless** so the results could be better compared and the also prompt did include the "reasoning" part:
+**O prompt é exatamente o mesmo para todos os modelos, independentemente**, para que então os resultados poderiam comparados entre si. O prompt também incluía a parte de “raciocínio” dentro dele (em inglês):
 
 > You will evaluate the statistics, articles, scrutinize the picks and bans phase by predicting which maps will be played and explain step-by-step why you think a particular team will win in match. After you choose your winner, criticize your thinking, and then respond with your final answer.
 
@@ -352,20 +356,20 @@ On this analysis, the **reasoning models performed worse then the other models.*
 
 > Your careful and thorough analysis, thinking step-by-step about each decision you are about to make in your conclusion. _ALWAYS GENERATE THIS FIRST_.
 
-Perhaps that confused the reasoning models? If you have any clue, please let me know!
+Talvez isso tenha confundido os modelos de raciocínio? Se você tiver alguma ideia do motivo, por favor, me mande uma mensagem!
 
-## It is a feature, not a bug
+## É um recurso, não um bug
 
-**In life, we learn that the unexpected sometimes happens. And that is great.**
+**Na vida, aprendemos que às vezes acontecem coisas inesperadas. E isso é ótimo.**
 
-Take the Vitality vs Legacy match prediction, for example. It was an astounding [3-13](https://www.hltv.org/matches/2382432/vitality-vs-legacy-blasttv-austin-major-2025) match where Legacy, a #46 ranked team wrecked Vitality, the #1 (and the championship winner btw) team. Pretty much no one saw that coming, and this is what makes sports so exciting.
+Veja a previsão da partida entre Vitality e Legacy, por exemplo. Foi uma partida surpreendente [3-13](https://www.hltv.org/matches/2382432/vitality-vs-legacy-blasttv-austin-major-2025) em que o Legacy, time classificado em 46º lugar, derrotou o Vitality, time classificado em 1º lugar (e vencedor do campeonato, aliás). Praticamente ninguém previu isso, e é isso que torna os esportes tão emocionantes.
 
-So, the fact the LLMs did not have a great performance on this test might be a feature of the sport itself that is hardly predictable and unexpected.
+Logo, o fato de os LLMs não terem tido um ótimo desempenho neste teste pode ser uma boa característica do próprio esporte, que é dificilmente previsível e inesperado.
 
-# Next Steps
+# Próximos passos
 
-For a next analysis, I'd like to avoid running everything **before the championship starts**, but rather execute the predictions **before each stage instead**. This would "reset" the predictions and allow the models to execute their analysis based on each stage individually.
+Para uma próxima análise, gostaria de evitar executar tudo **antes do início do campeonato**, mas sim executar as previsões **antes de cada etapa**. Isso “reiniciaria” as previsões e permitiria que os modelos executassem suas análises com base em cada etapa individualmente.
 
-Perhaps it could be even more granular by **running the predictions of each round individually** on a daily basis, as the [original project this was forked from](https://github.com/stevekrenzel/pick-ems) is doing.
+Talvez pudesse ser ainda mais granular, **executando as previsões de cada rodada individualmente** todos os dias, como o [projeto original do qual este foi derivado](https://github.com/stevekrenzel/pick-ems) está fazendo.
 
-Some similar match prediction work provides full statistical output as well: Instead of outputting the predicted winner, it outputs the probabilities of each team winning. This is something we could ask in the prompt too.
+Alguns trabalhos semelhantes de previsão de partidas também fornecem resultados estatísticos completos: em vez de apresentar o vencedor previsto, eles apresentam as probabilidades de cada time vencer. Isso é algo que também poderíamos solicitar no prompt.
