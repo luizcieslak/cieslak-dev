@@ -11,15 +11,15 @@ seo:
 
 ![Average team advancement prediction accuracy across all stages](/cs2-benchmark/overall-performance.png)
 
-Back in 2024, I wrote a [blog post](https://cieslak.dev/en/blog/2024-03-13-cs2-ai) about predicting Counter-Strike 2 matches inside a Major Championship context using OpenAI's GPT4 model.
+In 2024, I wrote a [blog post](https://cieslak.dev/en/blog/2024-03-13-cs2-ai) about predicting Counter-Strike 2 matches inside a Major Championship context using OpenAI's GPT4 model.
 
-In this post, I'm expading the experiment by doing a benchmark of different LLM models with the same purpose.
+In this post, I'm expanding the experiment by doing a benchmark of different LLM models with the same purpose.
 
 # TL;DR
 
 All the predictions were run **before** the championship started at [May 30, 2025](https://github.com/luizcieslak/cs2-match-prediction/commit/56a583b3965551e385be143f4206a479307da49f)
 
-When it comes to predict the team advancement between stages in the championship, **it did not have any improvements from the last experiment.** The best performant models were DeepSeek's `deepseek-chat` and OpenAI's `gpt-4.1`, which had a **58.3% avg accuracy** each.
+When it comes to predicting the team advancement between stages in the championship, **there were no improvements from the last experiment.** The best performant models were DeepSeek's `deepseek-chat` and OpenAI's `gpt-4.1`, which had a **58.3% avg accuracy** each.
 
 ![Average team advancement prediction accuracy across all stages](/cs2-benchmark/accuracy-heatmap.png)
 
@@ -27,20 +27,20 @@ When it comes to matches, Anthropic's `claude-sonnet-4` had the best accuracy: *
 
 ![Average team advancement prediction accuracy across all stages](/cs2-benchmark/analysis-per-match-faceted.png)
 
-More on the In Depth Analysis section, but for matches **I've just considered the ones that happened in the real world.** CS2 Major Championship is done in a Swiss format which basically means the matchups of a round are defined based on the results of the previous round.
+More on the [In Depth Analysis](#in-depth-analysis) section, but for matches **I've just considered the ones that happened in the real world.** CS2 Major Championship is done in a Swiss format which basically means the matchups of a round are defined based on the results of the previous round.
 
 # Code
 
 The code is open source and available at [luizcieslak/cs2-match-prediction](https://github.com/luizcieslak/cs2-match-prediction).
 
-The main code is built using Node+TypeScript, the data scraping is using Playwright (actually [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-nodejs) to bypass the anti-bot detection) and the analysis/charts are done via Python on Jupyter Notebooks.
+The main code is built using Node+TypeScript, the data scraping is using Playwright (actually [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-nodejs) to bypass the anti-bot detection) and the analysis/charts are done using Python in Jupyter Notebooks.
 
 # Full Prompt
 
-The prompt was the same as the one used in the previous post, but with a few tweaks:
+The prompt remained similar to the one used in the previous post, with a few tweaks:
 
 - Asked the LLM to try to predict the played maps and the picks/bans sequence.
-- Provide each active map stats in the prompt, so the LLM had the information about each team's performance in each map and in theory could predict the result with a higher accuracy.
+- Provide each active map stats in the prompt, so the LLM would have information about each team's performance in each map and in theory could predict the result with a higher accuracy.
 
 The prompt already had:
 
@@ -53,7 +53,9 @@ The prompt already had:
 Here's the full prompt example, in the match of Legacy vs Vitality:
 
 > SYSTEM:
-> You are an expert at choosing winning Counter-Strike teams in a "pick ems" competition. The teams are playing in a championship called "Blast Austin CS2 Major Championship". This championship is divided in three stages: Challenger, Legends and Playoffs. We currently are in the stage3 stage in which 16 teams face each other in a Swiss format. The top 8 teams are classified to the next stage and the bottom 8 are eliminated. Elimination and advancements matches are in a Best of 3 format where the others are in a Best of 1 format. This is going to be a Best of 1. In Counter-Strike competitive matches we have first a maps Picks and Bans phase, where the teams with their coach will ban alternatively 3 maps each team, then will play the one that remained.. The highest seed team (classified as 'home' in the input) will be able to start the picks and bans phase first and therefore has an advantage. Notice that this is a high-level competition, so the teams knows in advance their opponent and will study their performance on them.
+> You are an expert at choosing winning Counter-Strike teams in a "pick ems" competition. The teams are playing in a championship called "Blast Austin CS2 Major Championship". This championship is divided in four stages: Stage 1, Stage2, Stage 3 and Playoffs. We currently are in the stage3 stage in which 16 teams face each other in a Swiss format. The top 8 teams are classified to the next stage and the bottom 8 are eliminated. Elimination and advancements matches are in a Best of 3 format where the others are in a Best of 1 format. This is going to be a Best of 1 match.
+>
+> In Counter-Strike competitive matches we have first a maps Picks and Bans phase, where the teams with their coach will ban alternatively 3 maps each team, then will play the one that remained. The highest seed team (classified as 'home' in the input) will be able to start the picks and bans phase first and therefore has an advantage. Notice that this is a high-level competition, so the teams knows in advance their opponent and will study their performance on all the maps available to play.
 >
 > This is just for fun between friends. There is no betting or money to be made, but you will scrutinize your answer and think carefully.
 >
@@ -192,9 +194,11 @@ Here's the full prompt example, in the match of Legacy vs Vitality:
 
 # In Depth Analysis
 
-For the match prediction analysis, I've just considered the ones that happened in the real world. The [Valve Rulebook about Counter Strike championships](https://github.com/ValveSoftware/counter-strike_rules_and_regs/blob/main/major-supplemental-rulebook.md#mid-stage-seed-calculation) states the roudns they happen in a Swiss Format with [Buccholz system](https://en.wikipedia.org/wiki/Buchholz_system). This basically means that the matchups for a round are defined based on the results of the previous round and each team's seeding changes from the match results. **The highest seeding team in the matchup will have the first map ban/pick.** The lowest seeding can choose which side they want to start in that map.
+For the match prediction analysis, **I only considered the ones that happened in the real world**. The [Valve Rulebook about Counter Strike championships](https://github.com/ValveSoftware/counter-strike_rules_and_regs/blob/main/major-supplemental-rulebook.md#mid-stage-seed-calculation) states the rounds they happen in a Swiss Format with [Buccholz system](https://en.wikipedia.org/wiki/Buchholz_system).
 
-Considering all the predictions were made before the championship even started, **it means that any wrong predicted match done in the first rounds would be carried until the end of the championship.** Therefore, I've filtered the matches that actually happened so we can understand how good a LLM is at predicting a match outcome.
+Under this format, **the matchups for a round are defined based on the results of the previous round** and each team's seeding changes from the match results. **The highest seeding team in the matchup will have the first map ban/pick.** The lowest seeding can choose which side they want to start in that map.
+
+Considering all the predictions were made before the championship even started, **it means that any incorrectly predicted match in the first round would be carried until the end of the championship.** Therefore, I've filtered the matches that actually happened so we can understand how good a LLM is at predicting a match outcome.
 
 Now, let's check some outputs of how the LLMs built their responses.
 
@@ -248,9 +252,9 @@ Taking the [Lynn Vision vs Legacy match happened on the first round of the first
 > - Legacy's higher win rate and K/D ratio suggest they are in good form, but their map pool may be exploited by Lynn Vision's bans.
 > - Lynn Vision's recent roster changes, including the addition of C4LLM3SU3 and the return of Starry, have improved their firepower and synergy.
 
-It was the only model able to predict the winner on this match but unfortunately it wasn't able to predict the correct map: it was actually a Dust2, which was a strong map in the whole championship for Lynn Vision.
+It was the only model able to predict the winner on this match but it was unable to predict the correct map: it was actually a Dust2, which was a strong map in the whole championship for Lynn Vision.
 
-Now, let's see the analysis of a Best Of 3 match between [MOUZ and Vitality](https://www.hltv.org/matches/2382618/mouz-vs-vitality-blasttv-austin-major-2025) on the Playoffs stage, where Vitality won 2-1. This was from Anthropic's `claude-opus-4` model, which is a **reasoning model.**
+Now, let's see the analysis of a Best Of 3 match between [MOUZ and Vitality](https://www.hltv.org/matches/2382618/mouz-vs-vitality-blasttv-austin-major-2025) on the Playoffs stage, where Vitality won 2-1. This was from Anthropic's `claude-opus-4`, a **reasoning model.**
 
 > ## CSGO Match Analysis: Vitality vs MOUZ
 >
@@ -338,11 +342,21 @@ It could nail 2 of the 3 maps (Inferno and Train) and predict the winner.
 
 ## Reasoning models
 
-On this analysis, the **reasoning models performed worse then the other models.** I could not find the reason why, but it was a surprise to me. I kept the prompt equal to both of them so the results could be better compared and the prompt did incluse the "reasoning" part for both. Perhaps that confused the reasoning ones? If you have any clue, please let me know.
+On this analysis, the **reasoning models performed worse then the other models.** I could not find the reason why, but it was a surprise to me.
+
+**The prompt is exactly the same to all models regardless** so the results could be better compared and the also prompt did include the "reasoning" part:
+
+> You will evaluate the statistics, articles, scrutinize the picks and bans phase by predicting which maps will be played and explain step-by-step why you think a particular team will win in match. After you choose your winner, criticize your thinking, and then respond with your final answer.
+
+> Your response to the user. Think step-by-step about the decisions you are about to make. Be careful and thorough. \_ALWAYS GENERATE THE `analysis` BEFORE THE `conclusion`
+
+> Your careful and thorough analysis, thinking step-by-step about each decision you are about to make in your conclusion. _ALWAYS GENERATE THIS FIRST_.
+
+Perhaps that confused the reasoning models? If you have any clue, please let me know.
 
 ## It is a feature, not a bug
 
-Something that we learn in life is that **the unexpected happens, sometimes. And that is great.**
+**In life, we learn that the unexpected sometimes happens. And that is great.**
 
 Take the Vitality vs Legacy match prediction, for example. It was an astounding [3-13](https://www.hltv.org/matches/2382432/vitality-vs-legacy-blasttv-austin-major-2025) match where Legacy, a #46 ranked team wrecked Vitality, the #1 (and the championship winner btw) team. Pretty much no one saw that coming, and this is what makes sports so exciting.
 
@@ -350,8 +364,8 @@ So, the fact the LLMs did not have a great performance on this test might be a f
 
 # Next Steps
 
-For a next analysis, I'd like to avoid run everything **before the championship starts**, but rather execute the predictions **before each stage instead**. This would "reset" the predictions and allow the models to execute their analysis based on each stage individually.
+For a next analysis, I'd like to avoid running everything **before the championship starts**, but rather execute the predictions **before each stage instead**. This would "reset" the predictions and allow the models to execute their analysis based on each stage individually.
 
 Perhaps it could be even more granular by **running the predictions of each round individually** on a daily basis, as the [original project this was forked from](https://github.com/stevekrenzel/pick-ems) is doing.
 
-Some similar match prediction projects does the full statistic output as well: Instead of outputting the predicted winner, it outputs the probabilities of each team winning. This is something we could play around too.
+Some similar match prediction work provides full statistical output as well: Instead of outputting the predicted winner, it outputs the probabilities of each team winning. This is something we could ask in the prompt too.
