@@ -27,7 +27,7 @@ Quando se trata de partidas individuais, o `claude-sonnet-4` da Anthropic teve a
 
 ![Precisão média da previsão do avanço das equipes em todas as fases](/cs2-benchmark/analysis-per-match-faceted.png)
 
-Elaboro mais na seção [Análise aprofundada](#in-depth-analysis), mas para as partidas **eu considerei apenas as que aconteceram no mundo real.** O CS2 Major Championship é realizado no formato suíço, o que basicamente significa que os confrontos de uma rodada são definidos com base nos resultados da rodada anterior.
+Elaboro mais na seção [Análise aprofundada](#análise-aprofundada), mas para as partidas **eu considerei apenas as que aconteceram no mundo real.** O CS2 Major Championship é realizado no formato suíço, o que basicamente significa que os confrontos de uma rodada são definidos com base nos resultados da rodada anterior.
 
 # Code
 
