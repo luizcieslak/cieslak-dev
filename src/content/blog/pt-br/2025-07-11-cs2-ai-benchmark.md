@@ -1,5 +1,5 @@
 ---
-title: Previsão de Resultados de CS2 - Análise Comparativa de Modelos de IA
+title: Previsão de Resultados de CS2 - Análise Comparativa entre Modelos de IA
 exceprt: Um Benchmark de diferentes modelos de IA que preveem partidas de Counter-Strike 2 no Major de Austin em 2025.
 publishDate: '2025-07-17'
 updatedDate: '2025-07-17'
