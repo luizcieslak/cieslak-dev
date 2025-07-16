@@ -199,19 +199,153 @@ Considering all the predictions were made before the championship even started, 
 
 Now, let's check some outputs of how the LLMs built their responses.
 
-## Predictions
+## LLMs analysis
 
-//add some outputs here from different models
+Taking the [Lynn Vision vs Legacy match happened on the first round of the first stage](https://www.hltv.org/matches/2382301/lynn-vision-vs-legacy-blasttv-austin-major-2025-stage-1), where Lynn Vision won 13-7, this is the analysis by DeepSeek's `deepseek-chat` model:
+
+> ## CSGO Match Analysis by deepseek-chat: Lynn Vision vs Legacy
+>
+> ### Match Outcome
+>
+> **Winner**: Lynn Vision  
+> **Loser**: Legacy
+>
+> ### Detailed Analysis
+>
+> To determine the likely winner between Lynn Vision and Legacy in a Best of 1 match, we need to analyze several factors: team statistics, world rankings, map pool strengths, and recent performance. Here's a step-by-step breakdown:
+>
+> ### 1. Team Statistics
+>
+> - **Win Rate**: Legacy has a higher win rate (65.35%) compared to Lynn Vision (58.91%).
+> - **Kill/Death Ratio**: Legacy also has a better K/D ratio (1.12) compared to Lynn Vision (1.05).
+>
+> ### 2. World Rankings
+>
+> - Lynn Vision is ranked #25, while Legacy is ranked #46. This suggests Lynn Vision is generally considered the stronger team globally.
+>
+> ### 3. Map Pool Analysis
+>
+> - **Ancient**: Lynn Vision has a higher win percentage (68.0%) compared to Legacy (63.3%). Lynn Vision also has a slightly better pistol round win percentage (60.0% vs. 60.2%).
+> - **Dust2**: Legacy has a significantly higher win percentage (64.3%) compared to Lynn Vision (47.8%). Legacy also performs better on both CT and T sides.
+> - **Mirage**: Both teams have strong win percentages (Lynn Vision 68.6%, Legacy 72.2%). Lynn Vision picks this map frequently (84.4% pick rate), while Legacy bans it less often (20.9% ban rate).
+> - **Nuke**: Legacy has a higher win percentage (69.7%) compared to Lynn Vision (57.9%). Legacy also has a better CT-side performance (64.7% vs. 52.3%).
+>
+> ### 4. Recent Performance and News
+>
+> - Legacy has shown strong performances in recent matches, including a 2-0 win over Liquid and qualifying for multiple international LANs. Their new IGL, lux, has been impactful.
+> - Lynn Vision has had mixed results, including a loss to FURIA at IEM Dallas and a narrow loss to paiN in EPL S21. However, they have shown resilience in qualifiers and have a strong map pool on Mirage.
+>
+> ### 5. Picks and Bans Phase
+>
+> - As the higher seed, Lynn Vision will start the picks and bans phase first, giving them a slight advantage in map selection.
+> - Likely bans:
+>   - Lynn Vision may ban Dust2 (Legacy's strong map) or Nuke (Legacy's strong map).
+>   - Legacy may ban Mirage (Lynn Vision's most picked map) or Ancient (Lynn Vision's strong map).
+> - The remaining map is likely to be Ancient or Mirage, both of which favor Lynn Vision.
+>
+> ### 6. Key Factors
+>
+> - Lynn Vision's higher world ranking and strong performance on Mirage and Ancient give them an edge.
+> - Legacy's higher win rate and K/D ratio suggest they are in good form, but their map pool may be exploited by Lynn Vision's bans.
+> - Lynn Vision's recent roster changes, including the addition of C4LLM3SU3 and the return of Starry, have improved their firepower and synergy.
+
+It was the only model able to predict the winner on this match but unfortunately it wasn't able to predict the correct map: it was actually a Dust2, which was a strong map in the whole championship for Lynn Vision.
+
+Now, let's see the analysis of a Best Of 3 match between [MOUZ and Vitality](https://www.hltv.org/matches/2382618/mouz-vs-vitality-blasttv-austin-major-2025) on the Playoffs stage, where Vitality won 2-1. This was from Anthropic's `claude-opus-4` model, which is a **reasoning model.**
+
+> ## CSGO Match Analysis: Vitality vs MOUZ
+>
+> ### Match Outcome
+>
+> **Winner**: Vitality  
+> **Loser**: MOUZ
+>
+> ### Detailed Analysis
+>
+> ### Current Form and Recent Performance
+>
+> - Vitality is on an incredible 30-match win streak and has won 6 consecutive tournaments
+> - Vitality has a perfect 4-0 record in this championship, while MOUZ is 4-1 (their only loss to Spirit)
+> - Vitality's win rate is 76.43% compared to MOUZ's 56.90%
+> - Vitality is ranked #1 in the world, MOUZ is #2
+>
+> ### Head-to-Head Record
+>
+> - Looking at their recent matchups, Vitality has dominated MOUZ with 8 wins in their last 9 meetings
+> - MOUZ's only recent victory came at IEM Rio 2024
+> - Vitality swept MOUZ 3-0 in the IEM Dallas 2025 grand final just recently
+> - The psychological edge clearly favors Vitality, with MOUZ having a 6-match losing streak against them
+>
+> ### Map Pool Analysis and Likely Maps
+>
+> Since Vitality is the higher seed (home team), they will start the pick/ban phase:
+>
+> **Vitality's likely bans:**
+>
+> - Ancient (50% win rate, 24.7% ban rate) - Their weakest map
+> - Nuke (87.5% win rate but only 8 games played, they might be uncomfortable)
+>
+> **MOUZ's likely bans:**
+>
+> - Dust2 (26.5% ban rate for MOUZ, while Vitality has 81.2% win rate)
+> - Mirage (Vitality has 86.2% win rate, MOUZ only 54.1%)
+>
+> **Likely map picks:**
+>
+> - Vitality pick: Inferno (70.6% win rate for Vitality, 50% for MOUZ)
+> - MOUZ pick: Nuke (66.7% win rate for MOUZ, Vitality has limited data)
+> - Decider: Train (MOUZ has 66.7% win rate but only 6 games, Vitality has no recent data)
+>
+> ### Key Player Performances
+>
+> - ZywOo has been dominant, earning his 26th career MVP at IEM Dallas with a 1.52 rating
+> - torzsi from MOUZ has shown brilliance but faltered in the IEM Dallas final against Vitality
+> - flameZ and mezii have been providing crucial support for Vitality
+> - Spinx and Jimpphat have been key for MOUZ but couldn't deliver in the final
+>
+> ### Strengths and Weaknesses
+>
+> **Vitality strengths:**
+>
+> - Mental resilience and ability to win close games
+> - Deep map pool with strong performances across multiple maps
+> - ZywOo's consistent star performance
+> - Strong CT sides and late-round execution
+> - Experience closing out series and handling pressure
+>
+> **MOUZ weaknesses:**
+>
+> - Mental fragility in high-pressure situations against Vitality
+> - Tendency to lose control in late-game situations
+> - Slow starts on maps
+> - Struggles with economy management in crucial rounds
+>
+> ### Critical Factors
+>
+> - MOUZ has repeatedly shown they cannot handle the pressure against Vitality
+> - Vitality's ability to exploit MOUZ's defensive lapses was evident in Dallas
+> - The psychological barrier MOUZ faces against Vitality is significant
+> - Vitality's current form and momentum are overwhelming
+>
+> ### Map Predictions
+>
+> 1. Inferno (Vitality pick): Vitality's 70.6% win rate and strong CT side should prevail
+> 2. Nuke (MOUZ pick): MOUZ's best chance with 66.7% win rate, but Vitality can adapt
+> 3. Train (if needed): Limited data but MOUZ's small sample size success might not hold up
+>
+> Given all these factors, Vitality's dominance over MOUZ is clear and consistent.
+
+It could nail 2 of the 3 maps (Inferno and Train) and predict the winner.
 
 ## Reasoning models
 
-// perhaps discuss about the reasoning models? why did they not perform better?
+On this analysis, the **reasoning models performed worse then the other models.** I could not find the reason why, but it was a surprise to me. I kept the prompt equal to both of them so the results could be better compared and the prompt did incluse the "reasoning" part for both. Perhaps that confused the reasoning ones? If you have any clue, please let me know.
 
 ## It is a feature, not a bug
 
-Something that we learn in life is that **the unexpected happens, sometimes.** And that is great.
+Something that we learn in life is that **the unexpected happens, sometimes. And that is great.**
 
-Take the Vitality vs Legacy match prediction, for example. It was an astounding [3-13](https://www.hltv.org/matches/2382432/vitality-vs-legacy-blasttv-austin-major-2025) match were Legacy, a #46 ranked team wrecked Vitality, the #1 (and the championship winner btw) team. Pretty much no one saw that coming, and this is what makes sports so exciting.
+Take the Vitality vs Legacy match prediction, for example. It was an astounding [3-13](https://www.hltv.org/matches/2382432/vitality-vs-legacy-blasttv-austin-major-2025) match where Legacy, a #46 ranked team wrecked Vitality, the #1 (and the championship winner btw) team. Pretty much no one saw that coming, and this is what makes sports so exciting.
 
 So, the fact the LLMs did not have a great performance on this test might be a feature of the sport itself that is hardly predictable and unexpected.
 
