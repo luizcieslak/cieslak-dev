@@ -1,8 +1,8 @@
 ---
 title: CS2 Match Prediction with AI Multi-Model comparison
 excerpt: This is a benchmark of different LLM models that predict matches of Counter-Strike 2 in the 2025 Austin Major Championship.
-publishDate: '2025-07-11'
-updatedDate: '2025-07-11'
+publishDate: '2025-07-17'
+updatedDate: '2025-07-17'
 seo:
   image:
     src: '/cs2-benchmark/overall-performance.png'
@@ -11,14 +11,13 @@ seo:
 
 ![Average team advancement prediction accuracy across all stages](/cs2-benchmark/overall-performance.png)
 
-Back in 2024, I wrote a blog post about Counter-Strike 2 matches inside a Major Championship context using OpenAI's GPT4 model.
-In this post, I'm doing a benchmark of different LLM models for the same purpose.
+Back in 2024, I wrote a [blog post](https://cieslak.dev/en/blog/2024-03-13-cs2-ai) about predicting Counter-Strike 2 matches inside a Major Championship context using OpenAI's GPT4 model.
 
-Plus, add the map pool stats and did a tweak in the prompt to ask the LLM to try to predict the played maps.
-
-All the predictions were run **before** the championship started at [May 30, 2025](https://github.com/luizcieslak/cs2-match-prediction/commit/56a583b3965551e385be143f4206a479307da49f)
+In this post, I'm expading the experiment by doing a benchmark of different LLM models with the same purpose.
 
 # TL;DR
+
+All the predictions were run **before** the championship started at [May 30, 2025](https://github.com/luizcieslak/cs2-match-prediction/commit/56a583b3965551e385be143f4206a479307da49f)
 
 When it comes to predict the team advancement between stages in the championship, **it did not have any improvements from the last experiment.** The best performant models were DeepSeek's `deepseek-chat` and OpenAI's `gpt-4.1`, which had a **58.3% avg accuracy** each.
 
