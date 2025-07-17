@@ -10,7 +10,7 @@ import { sortItemsByDateDesc } from '../../utils/data-utils'
 const locale = Astro.currentLocale ?? 'en'
 const posts = (await getCollection('blog'))
 	.sort(sortItemsByDateDesc)
-	.filter(post => post.slug.includes(locale))
+	.filter(post => post.slug.startsWith(locale))
 // const featuredPosts = posts.filter(({ data }) => data.isFeatured)
 ---
 
