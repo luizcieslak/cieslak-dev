@@ -1,6 +1,6 @@
 ---
 title: Previsão de Resultados de CS2 - Análise Comparativa entre Modelos de IA
-exceprt: Um Benchmark de diferentes modelos de IA que preveem partidas de Counter-Strike 2 no Major de Austin em 2025.
+excerpt: Um Benchmark de diferentes modelos de IA que preveem partidas de Counter-Strike 2 no Major de Austin em 2025.
 publishDate: '2025-07-17'
 updatedDate: '2025-07-17'
 seo:
@@ -11,9 +11,9 @@ seo:
 
 ![Média da precisão no avanço de equipes entre as fases do campeonato](/cs2-benchmark/overall-performance.png)
 
-Em 2024, escrevi um [post](https://cieslak.dev/en/blog/2024-03-13-cs2-ai) sobre a previsão de partidas de Counter-Strike 2 dentro de um contexto do Major usando o modelo GPT4 da OpenAI.
+No início de 2024, escrevi um [post](https://cieslak.dev/en/blog/2024-03-13-cs2-ai) sobre a previsão de partidas de Counter-Strike 2 dentro de um contexto do Major usando o modelo GPT4 da OpenAI.
 
-Nesse novo post, expandi o experimento para fazer um _benchmark_ entre diferentes modelos de IA com o mesmo objetivo, a fim de entender qual deles é melhor para esse tipo de tarefa.
+Nesse novo post, expandi o experimento para fazer um _benchmark_ entre diferentes modelos de IA com o mesmo objetivo, para entender qual deles é melhor para esse tipo de tarefa.
 
 # Resumo
 
@@ -31,17 +31,15 @@ Elaboro mais na seção [Análise aprofundada](#análise-aprofundada), mas para 
 
 # Code
 
-The code is open source and available at [luizcieslak/cs2-match-prediction](https://github.com/luizcieslak/cs2-match-prediction).
+O código fonte é _open-source_ está disponível em [luizcieslak/cs2-match-prediction](https://github.com/luizcieslak/cs2-match-prediction).
 
-O código de _open-source_ está disponível em [luizcieslak/cs2-match-prediction](https://github.com/luizcieslak/cs2-match-prediction).
-
-É uma aplicação Node usando TypeScript, a extração de dados é feita usando o Playwright (nd verdade [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-nodejs) para passar da detecção de bots) e a análise/gráficos são feitas usando Python em Jupyter Notebooks.
+É uma aplicação Node usando TypeScript, a extração de dados é feita usando o Playwright (na verdade [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-nodejs) para passar da detecção de bots) e a análise/gráficos são feitos usando Python em Jupyter Notebooks.
 
 # Prompt Completo
 
 O prompt permaneceu semelhante ao usado na postagem anterior, com algumas alterações:
 
-- Adicionado uma nova estatística do desempenho dos times em cada mapa.
+- Adicionada uma nova estatística do desempenho dos times em cada mapa.
 - Tentar prever quais seriam os mapas jogados e a sequência de _picks/bans_ e, em teoria, poder prever o resultado com maior precisão.
 
 O prompt já tinha:
