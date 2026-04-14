@@ -85,6 +85,14 @@ src/content/pages/en/about.md
 src/content/pages/pt-br/about.md
 ```
 
+## Radio Page
+
+The `/en/radio` and `/pt-br/radio` routes host a minimal live-stream player backed by the [`lofi-radio`](https://github.com/luizcieslak/lofi-radio) server (API URL in [.env](.env) as `PUBLIC_RADIO_API_URL`). The page is defined in [src/pages/\[lang\]/radio.astro](src/pages/%5Blang%5D/radio.astro).
+
+**Reconnection logic:** the client listens for `error`, `stalled`, `ended`, and unexpected `pause` events on the audio element and reconnects to `/stream` with exponential backoff (1s → 1.5s → ... capped at 30s, reset on successful `play`). A `wantPlaying` flag separates user intent from transient browser pauses so we don't fight the user when they manually stop.
+
+**Why that logic exists (and when to remove it):** in theory a continuous MP3 stream should play forever in a naive client (think VLC or a hardware internet radio). In practice the browser decoder can hiccup at track transitions on the server — most commonly because tracks have different encoder parameters (sample rate / bitrate / channels), or because frame pacing drops for a moment while the next file is opened. The reconnection here is a defensive workaround; the real fix belongs on the server (normalize encoding across all tracks, pre-load the next track's first frames). Once that's addressed upstream, this client logic can be trimmed back to the bare play/pause handlers.
+
 ## Development
 
 ### Available Commands

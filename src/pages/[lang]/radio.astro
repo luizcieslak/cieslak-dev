@@ -90,6 +90,12 @@ const labels = {
 
 			audio.volume = Number(volume.value) / 100
 
+			let wantPlaying = false
+			let reconnectAttempt = 0
+			let reconnectTimer = null
+			const BASE_BACKOFF_MS = 1000
+			const MAX_BACKOFF_MS = 30000
+
 			function setTrack(track) {
 				if (!track) return
 				titleEl.textContent = track.title || ''
@@ -106,6 +112,30 @@ const labels = {
 				playBtn.setAttribute('aria-label', playing ? labels.pause : labels.play)
 				iconPlay.classList.toggle('hidden', playing)
 				iconPause.classList.toggle('hidden', !playing)
+			}
+
+			function connect() {
+				clearTimeout(reconnectTimer)
+				reconnectTimer = null
+				audio.src = RADIO_API + '/stream?t=' + Date.now()
+				audio.play().catch(() => scheduleReconnect())
+			}
+
+			function scheduleReconnect() {
+				if (!wantPlaying || reconnectTimer) return
+				const delay = Math.min(BASE_BACKOFF_MS * Math.pow(1.5, reconnectAttempt), MAX_BACKOFF_MS)
+				reconnectAttempt++
+				reconnectTimer = setTimeout(connect, delay)
+			}
+
+			function stop() {
+				wantPlaying = false
+				clearTimeout(reconnectTimer)
+				reconnectTimer = null
+				reconnectAttempt = 0
+				audio.pause()
+				audio.removeAttribute('src')
+				audio.load()
 			}
 
 			const controller = new AbortController()
@@ -127,20 +157,37 @@ const labels = {
 			playBtn.addEventListener(
 				'click',
 				() => {
-					if (audio.paused) {
-						audio.src = RADIO_API + '/stream'
-						audio.play().catch(() => renderPlayState(false))
+					if (!wantPlaying) {
+						wantPlaying = true
+						connect()
 					} else {
-						audio.pause()
-						audio.removeAttribute('src')
-						audio.load()
+						stop()
 					}
 				},
 				{ signal },
 			)
 
-			audio.addEventListener('play', () => renderPlayState(true), { signal })
-			audio.addEventListener('pause', () => renderPlayState(false), { signal })
+			audio.addEventListener(
+				'play',
+				() => {
+					reconnectAttempt = 0
+					renderPlayState(true)
+				},
+				{ signal },
+			)
+
+			audio.addEventListener(
+				'pause',
+				() => {
+					renderPlayState(false)
+					if (wantPlaying) scheduleReconnect()
+				},
+				{ signal },
+			)
+
+			audio.addEventListener('ended', () => scheduleReconnect(), { signal })
+			audio.addEventListener('error', () => scheduleReconnect(), { signal })
+			audio.addEventListener('stalled', () => scheduleReconnect(), { signal })
 
 			volume.addEventListener(
 				'input',
@@ -153,6 +200,8 @@ const labels = {
 			document.addEventListener(
 				'astro:before-preparation',
 				() => {
+					wantPlaying = false
+					clearTimeout(reconnectTimer)
 					events.close()
 					audio.pause()
 					audio.removeAttribute('src')
