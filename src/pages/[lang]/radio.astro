@@ -1,0 +1,139 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { getLangFromUrl, useTranslations } from '../../i18n/utils'
+
+export async function getStaticPaths() {
+	return [{ params: { lang: 'en' } }, { params: { lang: 'pt-br' } }]
+}
+
+const lang = getLangFromUrl(Astro.url)
+const t = useTranslations(lang)
+
+const RADIO_API = 'https://radio-api.cieslak.dev'
+const labels = {
+	play: t('radio.play'),
+	pause: t('radio.pause'),
+	coverSuffix: t('radio.coverSuffix'),
+}
+---
+
+<BaseLayout title={t('radio.title')} description={t('radio.description')}>
+	<div class='flex flex-col items-center w-full py-6 min-h-[70vh]'>
+		<div class='flex-1 flex flex-col items-center justify-center text-center gap-4 sm:gap-6 w-full'>
+			<img
+				id='radio-cover'
+				src=''
+				alt=''
+				class='w-[85vw] h-[85vw] max-w-full sm:w-[420px] sm:h-[420px] object-cover rounded shadow-lg bg-muted'
+			/>
+			<h1 id='radio-title' class='font-bold leading-tight text-[24px] sm:text-[32px]'></h1>
+			<p id='radio-artist' class='text-[16px] sm:text-[24px]'></p>
+			<p class='text-[16px] sm:text-[24px]'><em id='radio-album'></em></p>
+		</div>
+
+		<div class='w-full max-w-md flex items-center justify-center gap-4 mt-8'>
+			<button
+				id='radio-play'
+				type='button'
+				aria-label={t('radio.play')}
+				class='shrink-0 inline-flex items-center justify-center p-3 text-main bg-main border border-main rounded-full transition hover:bg-muted'
+			>
+				<svg
+					id='radio-icon-play'
+					xmlns='http://www.w3.org/2000/svg'
+					width='24'
+					height='24'
+					viewBox='0 0 24 24'
+					fill='currentColor'
+				>
+					<path d='M8 5v14l11-7z'></path>
+				</svg>
+				<svg
+					id='radio-icon-pause'
+					xmlns='http://www.w3.org/2000/svg'
+					width='24'
+					height='24'
+					viewBox='0 0 24 24'
+					fill='currentColor'
+					class='hidden'
+				>
+					<path d='M6 5h4v14H6zM14 5h4v14h-4z'></path>
+				</svg>
+			</button>
+			<input
+				id='radio-volume'
+				type='range'
+				min='0'
+				max='100'
+				value='70'
+				aria-label={t('radio.volume')}
+				class='flex-1 accent-current'
+			/>
+		</div>
+	</div>
+
+	<audio id='radio-audio' preload='none'></audio>
+
+	<script is:inline define:vars={{ RADIO_API, labels }}>
+		const audio = document.getElementById('radio-audio')
+		const playBtn = document.getElementById('radio-play')
+		const iconPlay = document.getElementById('radio-icon-play')
+		const iconPause = document.getElementById('radio-icon-pause')
+		const volume = document.getElementById('radio-volume')
+		const coverEl = document.getElementById('radio-cover')
+		const titleEl = document.getElementById('radio-title')
+		const artistEl = document.getElementById('radio-artist')
+		const albumEl = document.getElementById('radio-album')
+
+		audio.volume = Number(volume.value) / 100
+
+		function setTrack(track) {
+			if (!track) return
+			titleEl.textContent = track.title || ''
+			artistEl.textContent = track.artist || ''
+			albumEl.textContent = track.album || ''
+			const cover = track.albumArtUrl || track.coverUrl
+			if (cover) {
+				coverEl.src = cover
+				coverEl.alt = track.title ? track.title + ' ' + labels.coverSuffix : ''
+			}
+		}
+
+		function renderPlayState(playing) {
+			playBtn.setAttribute('aria-label', playing ? labels.pause : labels.play)
+			iconPlay.classList.toggle('hidden', playing)
+			iconPause.classList.toggle('hidden', !playing)
+		}
+
+		fetch(RADIO_API + '/now-playing')
+			.then(r => r.json())
+			.then(data => setTrack(data && data.track))
+			.catch(() => {})
+
+		const events = new EventSource(RADIO_API + '/now-playing/events')
+		events.onmessage = ev => {
+			try {
+				const data = JSON.parse(ev.data)
+				setTrack(data.track || data)
+			} catch {}
+		}
+
+		playBtn.addEventListener('click', () => {
+			if (audio.paused) {
+				audio.src = RADIO_API + '/stream'
+				audio.play().catch(() => renderPlayState(false))
+			} else {
+				audio.pause()
+				audio.removeAttribute('src')
+				audio.load()
+			}
+		})
+
+		audio.addEventListener('play', () => renderPlayState(true))
+		audio.addEventListener('pause', () => renderPlayState(false))
+
+		volume.addEventListener('input', () => {
+			audio.volume = Number(volume.value) / 100
+		})
+	</script>
+</BaseLayout>
