@@ -16,7 +16,6 @@ export const ui = {
 		'nav.home': 'Home',
 		'nav.about': 'About',
 		'nav.twitter': 'Twitter',
-		'footer.footnote': 'All rights reserved.',
 		'blog.updatedon': 'Updated on',
 		'radio.title': 'Radio',
 		'radio.description': 'Live radio stream',
@@ -28,7 +27,6 @@ export const ui = {
 	'pt-br': {
 		'nav.home': 'Início',
 		'nav.about': 'Sobre',
-		'footer.footnote': 'Todos os direitos reservados.',
 		'blog.updatedon': 'Atualizado em',
 		'radio.title': 'Rádio',
 		'radio.description': 'Transmissão de rádio ao vivo',
