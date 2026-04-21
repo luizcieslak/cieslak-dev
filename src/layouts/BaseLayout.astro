@@ -7,9 +7,12 @@ import Footer from '../components/Footer.astro'
 import Nav from '../components/Nav.astro'
 import PostHog from '../components/posthog.astro'
 
-export type Props = HeadProps
+export type Props = HeadProps & {
+	navVariant?: 'default' | 'radio'
+}
 
 const head = Astro.props
+const { navVariant = 'default' } = Astro.props
 ---
 
 <!doctype html>
@@ -26,7 +29,7 @@ const head = Astro.props
 	</head>
 	<body class='bg-main text-main'>
 		<div class='flex flex-col min-h-screen px-4 md:px-8'>
-			<Nav />
+			<Nav variant={navVariant} />
 			<main class='grow w-full max-w-3xl mx-auto'>
 				<slot />
 			</main>
