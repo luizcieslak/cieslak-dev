@@ -10,6 +10,17 @@ export interface GlowOptions {
 	blackThreshold?: number
 	skipWhite?: boolean
 	whiteThreshold?: number
+	majorBlobCount?: number
+	majorBlobOpacity?: number
+	majorBlobRadius?: number
+	majorBlobFeather?: number
+	jitter?: number
+	edgeBleed?: number
+	horizontalStretch?: number
+	verticalStretch?: number
+	sideBloomCount?: number
+	sideBloomOpacity?: number
+	sideBloomRadius?: number
 }
 
 export interface Rgb {
@@ -36,6 +47,17 @@ const DEFAULTS: Required<GlowOptions> = {
 	blackThreshold: 20,
 	skipWhite: true,
 	whiteThreshold: 235,
+	majorBlobCount: 5,
+	majorBlobOpacity: 0.78,
+	majorBlobRadius: 28,
+	majorBlobFeather: 66,
+	jitter: 18,
+	edgeBleed: 22,
+	horizontalStretch: 1.35,
+	verticalStretch: 1.1,
+	sideBloomCount: 2,
+	sideBloomOpacity: 0.32,
+	sideBloomRadius: 42,
 }
 
 export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): GlowHandle {
@@ -73,7 +95,7 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 	}
 
 	function apply(colors: Array<Rgb | null>) {
-		const gradient = buildGradient(colors, options.gridSize)
+		const gradient = buildGradient(colors, options)
 		const next = activeKey === 'a' ? layerB : layerA
 		const prev = activeKey === 'a' ? layerA : layerB
 		next.style.background = gradient
@@ -118,7 +140,7 @@ function styleLayer(el: HTMLDivElement, opts: Required<GlowOptions>) {
 	s.transform = 'translate(-50%, -50%)'
 	s.zIndex = '0'
 	s.width = `${opts.sizeMultiplier * 100}%`
-	s.height = '100%'
+	s.height = `${Math.max(100, opts.verticalStretch * 100)}%`
 	s.filter = `blur(${opts.blur}px)`
 	s.pointerEvents = 'none'
 	s.transition = `opacity ${opts.fadeMs}ms ease`
@@ -168,16 +190,83 @@ function dominantColor(imageData: ImageData, opts: Required<GlowOptions>): Rgb |
 	return { r: br * binSize, g: bg * binSize, b: bb * binSize }
 }
 
-function buildGradient(colors: Array<Rgb | null>, gridSize: number): string {
+function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): string {
+	const weighted = colors
+		.map((color, index) => {
+			if (!color) return null
+			const { row, col } = getGridPosition(index, opts.gridSize)
+			const centeredX = ((col + 0.5) / opts.gridSize - 0.5) * 2
+			const centeredY = ((row + 0.5) / opts.gridSize - 0.5) * 2
+			const intensity = channelSpread(color) + saturation(color) * 0.8 + (1 - Math.min(Math.abs(centeredY), 1)) * 24
+			return { color, index, row, col, centeredX, centeredY, intensity }
+		})
+		.filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+		.sort((a, b) => b.intensity - a.intensity)
+
+	if (weighted.length === 0) return 'none'
+
 	const parts: string[] = []
-	for (let i = 0; i < colors.length; i++) {
-		const c = colors[i]
-		if (!c) continue
-		const col = i % gridSize
-		const row = Math.floor(i / gridSize)
-		const x = ((col + 0.5) / gridSize) * 100
-		const y = ((row + 0.5) / gridSize) * 100
-		parts.push(`radial-gradient(circle at ${x}% ${y}%, rgba(${c.r},${c.g},${c.b},0.8) 0%, transparent 50%)`)
+	const major = weighted.slice(0, opts.majorBlobCount)
+	for (const entry of major) {
+		const seed = colorSeed(entry.color, entry.index)
+		const x = clamp(50 + entry.centeredX * (24 * opts.horizontalStretch) + randomBetween(seed, -opts.jitter, opts.jitter), -opts.edgeBleed, 100 + opts.edgeBleed)
+		const y = clamp(50 + entry.centeredY * 24 + randomBetween(seed + 1, -opts.jitter * 0.6, opts.jitter * 0.6), -12, 112)
+		const radiusX = opts.majorBlobRadius * randomBetween(seed + 2, 0.9, 1.45) * opts.horizontalStretch
+		const radiusY = opts.majorBlobRadius * randomBetween(seed + 3, 0.75, 1.25) * opts.verticalStretch
+		const opacity = clamp(opts.majorBlobOpacity * randomBetween(seed + 4, 0.82, 1.08), 0.12, 0.95)
+		const feather = clamp(opts.majorBlobFeather * randomBetween(seed + 5, 0.85, 1.15), radiusX + 10, 96)
+		parts.push(
+			`radial-gradient(${radiusX}% ${radiusY}% at ${x}% ${y}%, rgba(${entry.color.r},${entry.color.g},${entry.color.b},${opacity}) 0%, rgba(${entry.color.r},${entry.color.g},${entry.color.b},${opacity * 0.5}) ${Math.max(radiusX * 0.55, 18)}%, transparent ${feather}%)`,
+		)
 	}
+
+	for (let i = 0; i < Math.min(opts.sideBloomCount, major.length); i++) {
+		const entry = major[i]
+		const seed = colorSeed(entry.color, entry.index + 91)
+		const side = i % 2 === 0 ? -1 : 1
+		const x = side < 0
+			? randomBetween(seed, -opts.edgeBleed, 14)
+			: randomBetween(seed, 86, 100 + opts.edgeBleed)
+		const y = clamp(50 + entry.centeredY * 18 + randomBetween(seed + 1, -10, 10), 4, 96)
+		const radiusX = opts.sideBloomRadius * randomBetween(seed + 2, 1.2, 1.8) * opts.horizontalStretch
+		const radiusY = opts.sideBloomRadius * randomBetween(seed + 3, 0.75, 1.15) * opts.verticalStretch
+		const opacity = clamp(opts.sideBloomOpacity * randomBetween(seed + 4, 0.8, 1.1), 0.08, 0.5)
+		parts.push(
+			`radial-gradient(${radiusX}% ${radiusY}% at ${x}% ${y}%, rgba(${entry.color.r},${entry.color.g},${entry.color.b},${opacity}) 0%, transparent 72%)`,
+		)
+	}
+
 	return parts.join(', ')
+}
+
+function getGridPosition(index: number, gridSize: number) {
+	return {
+		col: index % gridSize,
+		row: Math.floor(index / gridSize),
+	}
+}
+
+function colorSeed(color: Rgb, salt: number): number {
+	return color.r * 3 + color.g * 5 + color.b * 7 + salt * 11
+}
+
+function randomBetween(seed: number, min: number, max: number): number {
+	const value = Math.sin(seed * 12.9898) * 43758.5453
+	const normalized = value - Math.floor(value)
+	return min + normalized * (max - min)
+}
+
+function saturation(color: Rgb): number {
+	const max = Math.max(color.r, color.g, color.b)
+	const min = Math.min(color.r, color.g, color.b)
+	if (max === 0) return 0
+	return ((max - min) / max) * 100
+}
+
+function channelSpread(color: Rgb): number {
+	return Math.max(color.r, color.g, color.b) - Math.min(color.r, color.g, color.b)
+}
+
+function clamp(value: number, min: number, max: number): number {
+	return Math.min(Math.max(value, min), max)
 }

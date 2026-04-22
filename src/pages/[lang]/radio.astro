@@ -232,7 +232,25 @@ const labels = {
 		document.addEventListener('astro:page-load', () => {
 			const img = document.getElementById('radio-cover') as HTMLImageElement | null
 			if (!img) return
-			const handle = mount(img, { binSize: 64, gridSize: 5 })
+
+			const isDarkMode = document.documentElement.classList.contains('dark')
+			const handle = mount(img, {
+				binSize: 64,
+				gridSize: 5,
+				blur: isDarkMode ? 56 : 46,
+				sizeMultiplier: isDarkMode ? 2.05 : 1.8,
+				majorBlobCount: isDarkMode ? 5 : 4,
+				majorBlobOpacity: isDarkMode ? 0.8 : 0.42,
+				majorBlobRadius: isDarkMode ? 30 : 26,
+				majorBlobFeather: isDarkMode ? 74 : 68,
+				jitter: isDarkMode ? 22 : 16,
+				edgeBleed: isDarkMode ? 30 : 20,
+				horizontalStretch: isDarkMode ? 1.5 : 1.35,
+				verticalStretch: isDarkMode ? 1.18 : 1.05,
+				sideBloomCount: 2,
+				sideBloomOpacity: isDarkMode ? 0.34 : 0.16,
+				sideBloomRadius: isDarkMode ? 48 : 36,
+			})
 
 			document.addEventListener('astro:before-preparation', () => handle.destroy(), { once: true })
 		})
