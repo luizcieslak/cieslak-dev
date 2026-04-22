@@ -79,25 +79,4 @@
 		line-height: 1;
 		opacity: 0.9;
 	}
-
-	.radio-track-meta {
-		position: relative;
-		z-index: 1;
-	}
-
-	.radio-track-meta::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		z-index: -1;
-		border-radius: 1.5rem;
-		background: linear-gradient(to bottom, transparent 0%, rgb(0 0 0 / 0.12) 38%, rgb(0 0 0 / 0.24) 100%);
-		filter: blur(18px);
-		opacity: 0.55;
-		pointer-events: none;
-	}
-
-	html:not(.dark) .radio-track-meta::before {
-		background: linear-gradient(to bottom, transparent 0%, rgb(247 238 210 / 0.28) 38%, rgb(247 238 210 / 0.6) 100%);
-	}
 }
