@@ -232,7 +232,7 @@ const labels = {
 		document.addEventListener('astro:page-load', () => {
 			const img = document.getElementById('radio-cover') as HTMLImageElement | null
 			if (!img) return
-			const handle = mount(img)
+			const handle = mount(img, { binSize: 64, gridSize: 5 })
 
 			document.addEventListener('astro:before-preparation', () => handle.destroy(), { once: true })
 		})
