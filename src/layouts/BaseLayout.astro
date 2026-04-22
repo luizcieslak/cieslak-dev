@@ -28,8 +28,8 @@ const { navVariant = 'default' } = Astro.props
 		<ViewTransitions />
 		<PostHog />
 	</head>
-	<body class='bg-main text-main'>
-		<div class='flex flex-col min-h-screen px-4 md:px-8'>
+	<body class='bg-main text-main overflow-x-hidden'
+		><div class='flex flex-col min-h-screen px-4 md:px-8'>
 			<Nav variant={navVariant} />
 			<main class='grow w-full max-w-3xl mx-auto'>
 				<slot />
