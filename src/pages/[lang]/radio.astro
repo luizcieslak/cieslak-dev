@@ -44,7 +44,7 @@ const labels = {
 			</div>
 		</div>
 
-		<div class='w-full max-w-md flex items-center justify-center gap-4 mt-8'>
+		<div class='w-full max-w-md flex items-center justify-center mt-8'>
 			<button
 				id='radio-play'
 				type='button'
@@ -73,15 +73,6 @@ const labels = {
 					<path d='M6 5h4v14H6zM14 5h4v14h-4z'></path>
 				</svg>
 			</button>
-			<input
-				id='radio-volume'
-				type='range'
-				min='0'
-				max='100'
-				value='70'
-				aria-label={t('radio.volume')}
-				class='flex-1 accent-current'
-			/>
 		</div>
 	</div>
 
@@ -95,13 +86,12 @@ const labels = {
 			const playBtn = document.getElementById('radio-play')
 			const iconPlay = document.getElementById('radio-icon-play')
 			const iconPause = document.getElementById('radio-icon-pause')
-			const volume = document.getElementById('radio-volume')
 			const coverEl = document.getElementById('radio-cover')
 			const titleEl = document.getElementById('radio-title')
 			const artistEl = document.getElementById('radio-artist')
 			const albumEl = document.getElementById('radio-album')
 
-			audio.volume = Number(volume.value) / 100
+			audio.volume = 0.7
 
 			let wantPlaying = false
 			let reconnectAttempt = 0
