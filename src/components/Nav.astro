@@ -42,7 +42,7 @@ const isRadioVariant = variant === 'radio'
 		)
 	}
 	<div class='absolute right-0 top-4 z-10 md:top-8 flex gap-4 items-center'>
-		<LanguagePicker />
+		{!isRadioVariant && <LanguagePicker />}
 		<ThemeToggle />
 	</div>
 </nav>
