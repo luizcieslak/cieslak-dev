@@ -14,6 +14,7 @@ const labels = {
 	play: t('radio.play'),
 	pause: t('radio.pause'),
 	coverSuffix: t('radio.coverSuffix'),
+	brand: 'lofi radio — cieslak.dev',
 }
 ---
 
@@ -96,11 +97,41 @@ const labels = {
 			let reconnectTimer = null
 			let wakeLock = null
 			let controlsVisibleTimer = null
+			let currentTrack = null
 			const BASE_BACKOFF_MS = 1000
 			const MAX_BACKOFF_MS = 30000
 
+			function updateMediaSession(track) {
+				if (!('mediaSession' in navigator)) return
+
+				if (!track) {
+					navigator.mediaSession.metadata = null
+					return
+				}
+
+				const cover = track.albumArtUrl || track.coverUrl
+				const artwork = cover
+					? [
+							{ src: cover, sizes: '96x96', type: 'image/jpeg' },
+							{ src: cover, sizes: '128x128', type: 'image/jpeg' },
+							{ src: cover, sizes: '192x192', type: 'image/jpeg' },
+							{ src: cover, sizes: '256x256', type: 'image/jpeg' },
+							{ src: cover, sizes: '384x384', type: 'image/jpeg' },
+							{ src: cover, sizes: '512x512', type: 'image/jpeg' },
+						]
+					: undefined
+
+				navigator.mediaSession.metadata = new MediaMetadata({
+					title: track.title || labels.brand,
+					artist: track.artist || labels.brand,
+					album: track.album || labels.brand,
+					artwork,
+				})
+			}
+
 			function setTrack(track) {
 				if (!track) return
+				currentTrack = track
 				titleEl.textContent = track.title || ''
 				artistEl.textContent = track.artist || ''
 				albumEl.textContent = track.album || ''
@@ -109,12 +140,17 @@ const labels = {
 					coverEl.src = cover
 					coverEl.alt = track.title ? track.title + ' ' + labels.coverSuffix : ''
 				}
+				updateMediaSession(track)
 			}
 
 			function renderPlayState(playing) {
 				playBtn.setAttribute('aria-label', playing ? labels.pause : labels.play)
 				iconPlay.classList.toggle('hidden', playing)
 				iconPause.classList.toggle('hidden', !playing)
+
+				if ('mediaSession' in navigator) {
+					navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'
+				}
 			}
 
 			function showControlsTemporarily() {
@@ -193,6 +229,15 @@ const labels = {
 			const controller = new AbortController()
 			const signal = controller.signal
 
+			if ('mediaSession' in navigator) {
+				navigator.mediaSession.setActionHandler('play', () => {
+					if (!wantPlaying) togglePlayback()
+				})
+				navigator.mediaSession.setActionHandler('pause', () => {
+					if (wantPlaying) togglePlayback()
+				})
+			}
+
 			fetch(RADIO_API + '/now-playing', { signal })
 				.then(r => r.json())
 				.then(data => setTrack(data && data.track))
@@ -251,6 +296,11 @@ const labels = {
 					clearTimeout(reconnectTimer)
 					if (controlsVisibleTimer) {
 						clearTimeout(controlsVisibleTimer)
+					}
+					if ('mediaSession' in navigator) {
+						navigator.mediaSession.playbackState = 'none'
+						navigator.mediaSession.setActionHandler('play', null)
+						navigator.mediaSession.setActionHandler('pause', null)
 					}
 					void releaseWakeLock()
 					events.close()
