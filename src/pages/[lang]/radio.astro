@@ -32,7 +32,7 @@ const labels = {
 					id='radio-play'
 					type='button'
 					aria-label={t('radio.play')}
-					class='absolute z-10 top-3 left-1/2 inline-flex -translate-x-1/2 items-center justify-center rounded-full border border-main bg-main/95 p-3 text-main opacity-0 shadow-lg backdrop-blur-sm transition duration-200 group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-muted focus-visible:opacity-100'
+					class='pointer-events-none absolute z-10 top-3 left-1/2 inline-flex -translate-x-1/2 items-center justify-center rounded-full border border-main bg-main/95 p-3 text-main opacity-0 shadow-lg backdrop-blur-sm transition duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 hover:bg-muted focus-visible:pointer-events-auto focus-visible:opacity-100'
 				>
 					<svg
 						id='radio-icon-play'
@@ -84,6 +84,7 @@ const labels = {
 			const iconPlay = document.getElementById('radio-icon-play')
 			const iconPause = document.getElementById('radio-icon-pause')
 			const coverEl = document.getElementById('radio-cover')
+			const coverFrameEl = coverEl.parentElement
 			const titleEl = document.getElementById('radio-title')
 			const artistEl = document.getElementById('radio-artist')
 			const albumEl = document.getElementById('radio-album')
@@ -94,6 +95,7 @@ const labels = {
 			let reconnectAttempt = 0
 			let reconnectTimer = null
 			let wakeLock = null
+			let controlsVisibleTimer = null
 			const BASE_BACKOFF_MS = 1000
 			const MAX_BACKOFF_MS = 30000
 
@@ -113,6 +115,24 @@ const labels = {
 				playBtn.setAttribute('aria-label', playing ? labels.pause : labels.play)
 				iconPlay.classList.toggle('hidden', playing)
 				iconPause.classList.toggle('hidden', !playing)
+			}
+
+			function showControlsTemporarily() {
+				if (!coverFrameEl) return
+				coverFrameEl.classList.add('show-radio-controls')
+				playBtn.classList.remove('pointer-events-none')
+				playBtn.classList.add('pointer-events-auto')
+
+				if (controlsVisibleTimer) {
+					clearTimeout(controlsVisibleTimer)
+				}
+
+				controlsVisibleTimer = setTimeout(() => {
+					coverFrameEl.classList.remove('show-radio-controls')
+					playBtn.classList.add('pointer-events-none')
+					playBtn.classList.remove('pointer-events-auto')
+					controlsVisibleTimer = null
+				}, 2500)
 			}
 
 			async function requestWakeLock() {
@@ -188,6 +208,7 @@ const labels = {
 
 			playBtn.addEventListener('click', togglePlayback, { signal })
 			coverEl.addEventListener('dblclick', togglePlayback, { signal })
+			coverEl.addEventListener('click', showControlsTemporarily, { signal })
 
 			audio.addEventListener(
 				'play',
@@ -228,6 +249,9 @@ const labels = {
 				() => {
 					wantPlaying = false
 					clearTimeout(reconnectTimer)
+					if (controlsVisibleTimer) {
+						clearTimeout(controlsVisibleTimer)
+					}
 					void releaseWakeLock()
 					events.close()
 					audio.pause()
@@ -239,6 +263,13 @@ const labels = {
 			)
 		})
 	</script>
+
+	<style is:inline>
+		.show-radio-controls > #radio-play {
+			opacity: 1;
+			pointer-events: auto;
+		}
+	</style>
 
 	<script>
 		import { mount } from '../../lib/ambient-glow'
