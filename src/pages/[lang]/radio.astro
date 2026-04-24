@@ -159,6 +159,17 @@ const labels = {
 				audio.load()
 			}
 
+			function togglePlayback() {
+				if (!wantPlaying) {
+					wantPlaying = true
+					void requestWakeLock()
+					connect()
+					return
+				}
+
+				stop()
+			}
+
 			const controller = new AbortController()
 			const signal = controller.signal
 
@@ -175,19 +186,8 @@ const labels = {
 				} catch {}
 			}
 
-			playBtn.addEventListener(
-				'click',
-				() => {
-					if (!wantPlaying) {
-						wantPlaying = true
-						void requestWakeLock()
-						connect()
-					} else {
-						stop()
-					}
-				},
-				{ signal },
-			)
+			playBtn.addEventListener('click', togglePlayback, { signal })
+			coverEl.addEventListener('dblclick', togglePlayback, { signal })
 
 			audio.addEventListener(
 				'play',
