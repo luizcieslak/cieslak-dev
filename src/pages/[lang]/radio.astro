@@ -20,13 +20,13 @@ const labels = {
 <BaseLayout title={t('radio.title')} description={t('radio.description')} navVariant='radio'>
 	<div class='flex h-[calc(100dvh-4.5rem)] flex-col items-center justify-center px-4 py-2 sm:py-4'>
 		<div class='flex w-full max-w-3xl flex-col items-center justify-center text-center gap-3 sm:gap-4'>
-			<div class='group relative inline-flex items-center justify-center'>
+			<div class='group relative inline-flex items-center justify-center overflow-visible max-w-full'>
 				<img
 					id='radio-cover'
 					src=''
 					alt=''
 					crossorigin='anonymous'
-					class='relative z-[1] w-[78vw] h-[78vw] max-w-full sm:w-[420px] sm:h-[420px] object-cover rounded shadow-lg bg-muted'
+					class='relative z-[1] h-auto aspect-square w-[min(78vw,420px)] object-cover rounded shadow-lg bg-muted'
 				/>
 				<button
 					id='radio-play'
