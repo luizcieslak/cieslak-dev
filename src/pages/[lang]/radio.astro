@@ -213,6 +213,7 @@ const labels = {
 				audio.pause()
 				audio.removeAttribute('src')
 				audio.load()
+				renderPlayState(false)
 			}
 
 			function togglePlayback() {
