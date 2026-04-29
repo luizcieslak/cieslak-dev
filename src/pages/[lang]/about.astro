@@ -1,6 +1,7 @@
 ---
 import siteConfig from '../../data/site-config'
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import RadioCallout from '../../components/RadioCallout.astro'
 import { type CollectionEntry, getCollection } from 'astro:content'
 
 export async function getStaticPaths() {
@@ -30,6 +31,7 @@ const { Content } = await page.render()
 	<section class='w-full flex flex-col gap-8 mb-16 sm:mb-24 mt-8'>
 		<div class='max-w-none prose prose-dante sm:prose-lg'>
 			<Content />
+			<RadioCallout />
 		</div>
 	</section>
 </BaseLayout>
