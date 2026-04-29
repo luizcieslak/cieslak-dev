@@ -9,17 +9,21 @@ export async function getStaticPaths() {
 const lang = getLangFromUrl(Astro.url)
 const t = useTranslations(lang)
 
-const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
 const labels = {
 	play: t('radio.play'),
 	pause: t('radio.pause'),
 	coverSuffix: t('radio.coverSuffix'),
-	brand: 'lofi radio — cieslak.dev',
 }
 ---
 
 <BaseLayout title={t('radio.title')} description={t('radio.description')} navVariant='radio'>
-	<div class='flex h-[calc(100dvh-4.5rem)] flex-col items-center justify-center px-4 py-2 sm:py-4'>
+	<div
+		id='radio-page-root'
+		data-label-play={labels.play}
+		data-label-pause={labels.pause}
+		data-label-cover-suffix={labels.coverSuffix}
+		class='flex h-[calc(100dvh-4.5rem)] flex-col items-center justify-center px-4 py-2 sm:py-4'
+	>
 		<div class='flex w-full max-w-3xl flex-col items-center justify-center text-center gap-3 sm:gap-4'>
 			<div class='group relative inline-flex items-center justify-center overflow-visible max-w-full'>
 				<img
@@ -74,94 +78,47 @@ const labels = {
 		</div>
 	</div>
 
-	<audio id='radio-audio' preload='none'></audio>
+	<style is:inline>
+		.show-radio-controls > #radio-play {
+			opacity: 1;
+			pointer-events: auto;
+		}
+	</style>
 
-	<script is:inline define:vars={{ RADIO_API, labels }}>
+	<script>
+		import { getRadioPlayer } from '../../lib/radio-player'
+		import { mount } from '../../lib/ambient-glow'
+
+		const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
+
 		document.addEventListener('astro:page-load', () => {
-			const audio = document.getElementById('radio-audio')
-			if (!audio) return
+			const root = document.getElementById('radio-page-root')
+			const audio = document.getElementById('radio-audio') as HTMLAudioElement | null
+			if (!root || !audio) return
 
-			const playBtn = document.getElementById('radio-play')
-			const iconPlay = document.getElementById('radio-icon-play')
-			const iconPause = document.getElementById('radio-icon-pause')
-			const coverEl = document.getElementById('radio-cover')
-			const coverFrameEl = coverEl.parentElement
-			const titleEl = document.getElementById('radio-title')
-			const artistEl = document.getElementById('radio-artist')
-			const albumEl = document.getElementById('radio-album')
+			const labelPlay = root.dataset.labelPlay || 'Play'
+			const labelPause = root.dataset.labelPause || 'Pause'
+			const labelCoverSuffix = root.dataset.labelCoverSuffix || ''
 
-			audio.volume = 0.7
+			const player = getRadioPlayer(audio, RADIO_API)
 
-			let wantPlaying = false
-			let reconnectAttempt = 0
-			let reconnectTimer = null
-			let wakeLock = null
-			let controlsVisibleTimer = null
-			let currentTrack = null
-			const BASE_BACKOFF_MS = 1000
-			const MAX_BACKOFF_MS = 30000
+			const playBtn = document.getElementById('radio-play')!
+			const iconPlay = document.getElementById('radio-icon-play')!
+			const iconPause = document.getElementById('radio-icon-pause')!
+			const coverEl = document.getElementById('radio-cover') as HTMLImageElement
+			const coverFrameEl = coverEl.parentElement!
+			const titleEl = document.getElementById('radio-title')!
+			const artistEl = document.getElementById('radio-artist')!
+			const albumEl = document.getElementById('radio-album')!
 
-			function updateMediaSession(track) {
-				if (!('mediaSession' in navigator)) return
-
-				if (!track) {
-					navigator.mediaSession.metadata = null
-					return
-				}
-
-				const cover = track.albumArtUrl || track.coverUrl
-				const artwork = cover
-					? [
-							{ src: cover, sizes: '96x96', type: 'image/jpeg' },
-							{ src: cover, sizes: '128x128', type: 'image/jpeg' },
-							{ src: cover, sizes: '192x192', type: 'image/jpeg' },
-							{ src: cover, sizes: '256x256', type: 'image/jpeg' },
-							{ src: cover, sizes: '384x384', type: 'image/jpeg' },
-							{ src: cover, sizes: '512x512', type: 'image/jpeg' },
-						]
-					: undefined
-
-				navigator.mediaSession.metadata = new MediaMetadata({
-					title: track.title || labels.brand,
-					artist: track.artist || labels.brand,
-					album: track.album || labels.brand,
-					artwork,
-				})
-			}
-
-			function setTrack(track) {
-				if (!track) return
-				currentTrack = track
-				titleEl.textContent = track.title || ''
-				artistEl.textContent = track.artist || ''
-				albumEl.textContent = track.album || ''
-				const cover = track.albumArtUrl || track.coverUrl
-				if (cover) {
-					coverEl.src = cover
-					coverEl.alt = track.title ? track.title + ' ' + labels.coverSuffix : ''
-				}
-				updateMediaSession(track)
-			}
-
-			function renderPlayState(playing) {
-				playBtn.setAttribute('aria-label', playing ? labels.pause : labels.play)
-				iconPlay.classList.toggle('hidden', playing)
-				iconPause.classList.toggle('hidden', !playing)
-
-				if ('mediaSession' in navigator) {
-					navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'
-				}
-			}
+			let controlsVisibleTimer: ReturnType<typeof setTimeout> | null = null
 
 			function showControlsTemporarily() {
-				if (!coverFrameEl) return
 				coverFrameEl.classList.add('show-radio-controls')
 				playBtn.classList.remove('pointer-events-none')
 				playBtn.classList.add('pointer-events-auto')
 
-				if (controlsVisibleTimer) {
-					clearTimeout(controlsVisibleTimer)
-				}
+				if (controlsVisibleTimer) clearTimeout(controlsVisibleTimer)
 
 				controlsVisibleTimer = setTimeout(() => {
 					coverFrameEl.classList.remove('show-radio-controls')
@@ -171,165 +128,31 @@ const labels = {
 				}, 2500)
 			}
 
-			async function requestWakeLock() {
-				if (!wantPlaying || !('wakeLock' in navigator) || wakeLock) return
-
-				try {
-					wakeLock = await navigator.wakeLock.request('screen')
-					wakeLock.addEventListener('release', () => {
-						wakeLock = null
-					})
-				} catch {}
-			}
-
-			async function releaseWakeLock() {
-				if (!wakeLock) return
-
-				const lock = wakeLock
-				wakeLock = null
-				await lock.release().catch(() => {})
-			}
-
-			function connect() {
-				clearTimeout(reconnectTimer)
-				reconnectTimer = null
-				audio.src = RADIO_API + '/stream?t=' + Date.now()
-				audio.play().catch(() => scheduleReconnect())
-			}
-
-			function scheduleReconnect() {
-				if (!wantPlaying || reconnectTimer) return
-				const delay = Math.min(BASE_BACKOFF_MS * Math.pow(1.5, reconnectAttempt), MAX_BACKOFF_MS)
-				reconnectAttempt++
-				reconnectTimer = setTimeout(connect, delay)
-			}
-
-			function stop() {
-				wantPlaying = false
-				clearTimeout(reconnectTimer)
-				reconnectTimer = null
-				reconnectAttempt = 0
-				void releaseWakeLock()
-				audio.pause()
-				audio.removeAttribute('src')
-				audio.load()
-				renderPlayState(false)
-			}
-
-			function togglePlayback() {
-				if (!wantPlaying) {
-					wantPlaying = true
-					void requestWakeLock()
-					connect()
-					return
-				}
-
-				stop()
-			}
-
 			const controller = new AbortController()
-			const signal = controller.signal
+			const { signal } = controller
 
-			if ('mediaSession' in navigator) {
-				navigator.mediaSession.setActionHandler('play', () => {
-					if (!wantPlaying) togglePlayback()
-				})
-				navigator.mediaSession.setActionHandler('pause', () => {
-					if (wantPlaying) togglePlayback()
-				})
-			}
-
-			fetch(RADIO_API + '/now-playing', { signal })
-				.then(r => r.json())
-				.then(data => setTrack(data && data.track))
-				.catch(() => {})
-
-			const events = new EventSource(RADIO_API + '/now-playing/events')
-			events.onmessage = ev => {
-				try {
-					const data = JSON.parse(ev.data)
-					setTrack(data.track || data)
-				} catch {}
-			}
-
-			playBtn.addEventListener('click', togglePlayback, { signal })
-			coverEl.addEventListener('dblclick', togglePlayback, { signal })
+			playBtn.addEventListener('click', () => player.toggle(), { signal })
+			coverEl.addEventListener('dblclick', () => player.toggle(), { signal })
 			coverEl.addEventListener('click', showControlsTemporarily, { signal })
 
-			audio.addEventListener(
-				'play',
-				() => {
-					reconnectAttempt = 0
-					void requestWakeLock()
-					renderPlayState(true)
-				},
-				{ signal },
-			)
+			const unsubscribe = player.subscribe(state => {
+				const track = state.track
+				titleEl.textContent = track?.title || ''
+				artistEl.textContent = track?.artist || ''
+				albumEl.textContent = track?.album || ''
+				const cover = track?.albumArtUrl || track?.coverUrl || ''
+				if (cover && coverEl.src !== cover) {
+					coverEl.src = cover
+					coverEl.alt = track?.title ? `${track.title} ${labelCoverSuffix}` : ''
+				}
 
-			audio.addEventListener(
-				'pause',
-				() => {
-					renderPlayState(false)
-					if (wantPlaying) scheduleReconnect()
-				},
-				{ signal },
-			)
+				const showingPlaying = state.wantPlaying
+				playBtn.setAttribute('aria-label', showingPlaying ? labelPause : labelPlay)
+				iconPlay.classList.toggle('hidden', showingPlaying)
+				iconPause.classList.toggle('hidden', !showingPlaying)
+			})
 
-			audio.addEventListener('ended', () => scheduleReconnect(), { signal })
-			audio.addEventListener('error', () => scheduleReconnect(), { signal })
-			audio.addEventListener('stalled', () => scheduleReconnect(), { signal })
-
-			document.addEventListener(
-				'visibilitychange',
-				() => {
-					if (!wantPlaying) return
-					if (document.visibilityState === 'visible') {
-						void requestWakeLock()
-					}
-				},
-				{ signal },
-			)
-
-			document.addEventListener(
-				'astro:before-preparation',
-				() => {
-					wantPlaying = false
-					clearTimeout(reconnectTimer)
-					if (controlsVisibleTimer) {
-						clearTimeout(controlsVisibleTimer)
-					}
-					if ('mediaSession' in navigator) {
-						navigator.mediaSession.playbackState = 'none'
-						navigator.mediaSession.setActionHandler('play', null)
-						navigator.mediaSession.setActionHandler('pause', null)
-					}
-					void releaseWakeLock()
-					events.close()
-					audio.pause()
-					audio.removeAttribute('src')
-					audio.load()
-					controller.abort()
-				},
-				{ once: true },
-			)
-		})
-	</script>
-
-	<style is:inline>
-		.show-radio-controls > #radio-play {
-			opacity: 1;
-			pointer-events: auto;
-		}
-	</style>
-
-	<script>
-		import { mount } from '../../lib/ambient-glow'
-
-		document.addEventListener('astro:page-load', () => {
-			const img = document.getElementById('radio-cover') as HTMLImageElement | null
-			if (!img) return
-
-			const handle = mount(img, {
+			const glow = mount(coverEl, {
 				binSize: 64,
 				gridSize: 5,
 				blur: 56,
@@ -347,7 +170,16 @@ const labels = {
 				sideBloomRadius: 48,
 			})
 
-			document.addEventListener('astro:before-preparation', () => handle.destroy(), { once: true })
+			document.addEventListener(
+				'astro:before-preparation',
+				() => {
+					if (controlsVisibleTimer) clearTimeout(controlsVisibleTimer)
+					unsubscribe()
+					controller.abort()
+					glow.destroy()
+				},
+				{ once: true },
+			)
 		})
 	</script>
 </BaseLayout>

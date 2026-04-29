@@ -93,6 +93,18 @@ The `/en/radio` and `/pt-br/radio` routes host a minimal live-stream player back
 
 **Why that logic exists (and when to remove it):** in theory a continuous MP3 stream should play forever in a naive client (think VLC or a hardware internet radio). In practice the browser decoder can hiccup at track transitions on the server — most commonly because tracks have different encoder parameters (sample rate / bitrate / channels), or because frame pacing drops for a moment while the next file is opened. The reconnection here is a defensive workaround; the real fix belongs on the server (normalize encoding across all tracks, pre-load the next track's first frames). Once that's addressed upstream, this client logic can be trimmed back to the bare play/pause handlers.
 
+### Persistent Playback Across Navigations
+
+Playback survives client-side navigation via Astro's `<ViewTransitions />` (already mounted in [BaseLayout.astro](src/layouts/BaseLayout.astro)) plus `transition:persist` on the audio element and miniplayer. The player itself is a singleton module — [src/lib/radio-player.ts](src/lib/radio-player.ts) — that owns the audio element, SSE subscription, reconnect logic, wake lock, and media session. Three UI surfaces share that single source of truth:
+
+- **Full page** ([src/pages/\[lang\]/radio.astro](src/pages/%5Blang%5D/radio.astro)) — big cover with ambient glow, only on `/radio`.
+- **Miniplayer** ([src/components/RadioMiniplayer.astro](src/components/RadioMiniplayer.astro)) — slim fixed-bottom bar, mounted in BaseLayout, hidden on `/radio` and when no track is loaded. Hosts the persisted `<audio>` element.
+- **Callout** ([src/components/RadioCallout.astro](src/components/RadioCallout.astro)) — inline component for embedding in content (currently demoed on the about page; intended for the future radio deep-dive blog post). Clicking play kickstarts the radio, which then surfaces the miniplayer site-wide.
+
+Each surface calls `getRadioPlayer(audio, api)` to grab the singleton, then `subscribe()` for state updates and `toggle()` for play/pause. Scripts re-run on `astro:page-load` even inside persisted elements, so initialization is guarded by `window.__radioPlayer` and per-surface bindings (miniplayer) are guarded by `window.__radioMiniplayerBound`. Page-scoped surfaces (radio page, callout) re-bind their own listeners every navigation and clean up on `astro:before-preparation`.
+
+**Future work:** the miniplayer chrome is currently sized for mobile (full-width fixed bar). A desktop variant should be smaller and less prominent (e.g., bottom-right floating pill) — same player module, different chrome.
+
 ## Development
 
 ### Available Commands

@@ -1,0 +1,120 @@
+---
+import { getLangFromUrl, useTranslations } from '../i18n/utils'
+
+const lang = getLangFromUrl(Astro.url)
+const t = useTranslations(lang)
+
+const headingByLang: Record<string, string> = {
+	en: 'Listen along while you read',
+	'pt-br': 'Ouça enquanto você lê',
+}
+const bodyByLang: Record<string, string> = {
+	en: 'A small lofi stream I run on a side server. Hit play and a miniplayer follows you around the site.',
+	'pt-br':
+		'Uma pequena rádio lofi que eu mantenho em um servidor secundário. Aperte play e um miniplayer te acompanha pelo site.',
+}
+
+const heading = headingByLang[lang] || headingByLang.en
+const body = bodyByLang[lang] || bodyByLang.en
+const labelPlay = t('radio.play')
+const labelPause = t('radio.pause')
+---
+
+<aside
+	class='radio-callout my-10 flex items-center gap-4 rounded-lg border border-main/20 bg-muted/40 px-5 py-4 not-prose'
+	data-label-play={labelPlay}
+	data-label-pause={labelPause}
+>
+	<button
+		class='radio-callout-toggle inline-flex h-12 w-12 flex-none items-center justify-center rounded-full border border-main bg-main/95 text-main shadow-sm transition hover:bg-muted'
+		type='button'
+		aria-label={labelPlay}
+	>
+		<svg
+			class='radio-callout-icon-play'
+			xmlns='http://www.w3.org/2000/svg'
+			width='22'
+			height='22'
+			viewBox='0 0 24 24'
+			fill='currentColor'
+		>
+			<path d='M8 5v14l11-7z'></path>
+		</svg>
+		<svg
+			class='radio-callout-icon-pause hidden'
+			xmlns='http://www.w3.org/2000/svg'
+			width='22'
+			height='22'
+			viewBox='0 0 24 24'
+			fill='currentColor'
+		>
+			<path d='M6 5h4v14H6zM14 5h4v14h-4z'></path>
+		</svg>
+	</button>
+	<div class='min-w-0 flex-1'>
+		<p class='font-medium leading-tight'>{heading}</p>
+		<p class='mt-1 text-sm leading-snug opacity-75'>{body}</p>
+		<p class='radio-callout-now-playing mt-2 hidden truncate text-sm leading-snug opacity-85'>
+			<span class='radio-callout-track-title'></span>
+			<span class='opacity-70'> — </span>
+			<span class='radio-callout-track-artist'></span>
+		</p>
+	</div>
+</aside>
+
+<script>
+	import { getRadioPlayer } from '../lib/radio-player'
+
+	const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
+
+	document.addEventListener('astro:page-load', () => {
+		const callouts = document.querySelectorAll<HTMLElement>('.radio-callout')
+		if (callouts.length === 0) return
+
+		const audio = document.getElementById('radio-audio') as HTMLAudioElement | null
+		if (!audio) return
+
+		const player = getRadioPlayer(audio, RADIO_API)
+
+		callouts.forEach(callout => {
+			const labelPlay = callout.dataset.labelPlay || 'Play'
+			const labelPause = callout.dataset.labelPause || 'Pause'
+			const toggleBtn = callout.querySelector<HTMLButtonElement>('.radio-callout-toggle')!
+			const iconPlay = callout.querySelector<SVGElement>('.radio-callout-icon-play')!
+			const iconPause = callout.querySelector<SVGElement>('.radio-callout-icon-pause')!
+			const nowPlaying = callout.querySelector<HTMLElement>('.radio-callout-now-playing')!
+			const titleEl = callout.querySelector<HTMLElement>('.radio-callout-track-title')!
+			const artistEl = callout.querySelector<HTMLElement>('.radio-callout-track-artist')!
+
+			const controller = new AbortController()
+			const { signal } = controller
+
+			toggleBtn.addEventListener('click', () => player.toggle(), { signal })
+
+			const unsubscribe = player.subscribe(state => {
+				const playing = state.wantPlaying
+				toggleBtn.setAttribute('aria-label', playing ? labelPause : labelPlay)
+				iconPlay.classList.toggle('hidden', playing)
+				iconPause.classList.toggle('hidden', !playing)
+
+				const track = state.track
+				if (playing && track) {
+					titleEl.textContent = track.title || ''
+					artistEl.textContent = track.artist || ''
+					nowPlaying.classList.remove('hidden')
+				} else {
+					nowPlaying.classList.add('hidden')
+				}
+			})
+
+			document.addEventListener(
+				'astro:before-preparation',
+				() => {
+					unsubscribe()
+					controller.abort()
+				},
+				{ once: true },
+			)
+		})
+	})
+</script>
