@@ -26,12 +26,18 @@ const labels = {
 	>
 		<div class='flex w-full max-w-3xl flex-col items-center justify-center text-center gap-3 sm:gap-4'>
 			<div class='group relative inline-flex items-center justify-center overflow-visible max-w-full'>
+				<div
+					id='radio-cover-skeleton'
+					aria-hidden='true'
+					class='absolute inset-0 z-[1] rounded bg-muted shadow-lg animate-pulse transition-opacity duration-500'
+				>
+				</div>
 				<img
 					id='radio-cover'
 					src=''
 					alt=''
 					crossorigin='anonymous'
-					class='relative z-[1] h-auto aspect-square w-[min(78vw,420px)] object-cover rounded shadow-lg bg-muted'
+					class='relative z-[2] h-auto aspect-square w-[min(78vw,420px)] object-cover rounded shadow-lg opacity-0 transition-opacity duration-500'
 				/>
 				<button
 					id='radio-play'
@@ -107,6 +113,7 @@ const labels = {
 			const iconPause = document.getElementById('radio-icon-pause')!
 			const coverEl = document.getElementById('radio-cover') as HTMLImageElement
 			const coverFrameEl = coverEl.parentElement!
+			const skeletonEl = document.getElementById('radio-cover-skeleton')!
 			const titleEl = document.getElementById('radio-title')!
 			const artistEl = document.getElementById('radio-artist')!
 			const albumEl = document.getElementById('radio-album')!
@@ -134,6 +141,13 @@ const labels = {
 			playBtn.addEventListener('click', () => player.toggle(), { signal })
 			coverEl.addEventListener('dblclick', () => player.toggle(), { signal })
 			coverEl.addEventListener('click', showControlsTemporarily, { signal })
+
+			const revealCover = () => {
+				coverEl.classList.remove('opacity-0')
+				skeletonEl.classList.add('opacity-0')
+			}
+			coverEl.addEventListener('load', revealCover, { signal })
+			if (coverEl.complete && coverEl.naturalWidth) revealCover()
 
 			const unsubscribe = player.subscribe(state => {
 				const track = state.track
