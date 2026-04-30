@@ -9,6 +9,7 @@ export type RadioTrack = {
 export type RadioState = {
 	wantPlaying: boolean
 	playing: boolean
+	hasInteracted: boolean
 	track: RadioTrack | null
 }
 
@@ -45,7 +46,7 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		api,
 		audio,
 		listeners: new Set(),
-		state: { wantPlaying: false, playing: false, track: null },
+		state: { wantPlaying: false, playing: false, hasInteracted: false, track: null },
 		reconnectAttempt: 0,
 		reconnectTimer: null,
 		wakeLock: null,
@@ -137,7 +138,7 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 
 	const toggle = () => {
 		if (!internal.state.wantPlaying) {
-			internal.state = { ...internal.state, wantPlaying: true }
+			internal.state = { ...internal.state, wantPlaying: true, hasInteracted: true }
 			void requestWakeLock()
 			connect()
 			emit()

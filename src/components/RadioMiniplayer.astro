@@ -86,8 +86,8 @@ const labels = {
 
 	function applyVisibility(root: HTMLElement) {
 		const onRadioPage = root.dataset.onRadio === 'true'
-		const hasTrack = root.dataset.hasTrack === 'true'
-		root.dataset.visible = !onRadioPage && hasTrack ? 'true' : 'false'
+		const hasInteracted = root.dataset.hasInteracted === 'true'
+		root.dataset.visible = !onRadioPage && hasInteracted ? 'true' : 'false'
 	}
 
 	function updateRouteVisibility() {
@@ -148,7 +148,7 @@ const labels = {
 				coverEl.src = cover
 				coverEl.alt = track?.title || ''
 			}
-			root.dataset.hasTrack = track ? 'true' : 'false'
+			root.dataset.hasInteracted = state.hasInteracted ? 'true' : 'false'
 			applyVisibility(root)
 
 			const showingPlaying = state.wantPlaying
