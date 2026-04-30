@@ -48,11 +48,11 @@ const { Content } = await post.render()
 >
 	<article class='mb-16 sm:mb-24'>
 		<header class='mb-8'>
-			<h1 class='text-3xl leading-tight font-serif font-medium sm:text-5xl sm:leading-tight'>{title}</h1>
+			<h1 class='text-3xl leading-tight font-serif font-semibold sm:text-5xl sm:leading-tight'>{title}</h1>
 			<div class='mt-4 text-sm'>
 				<FormattedDate date={publishDate} />
 				{
-					updatedDate && (
+					updatedDate && publishDate.toISOString() !== updatedDate.toISOString() && (
 						<>
 							{' '}
 							<span>
@@ -156,6 +156,27 @@ const { Content } = await post.render()
 			}
 
 			padding: 0 8px;
+		}
+
+		:where(p code):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+			/* Remove the bold weight */
+			font-weight: normal;
+			/* Add background */
+			background-color: #fff1e7;
+			color: #e05f2d;
+			padding: 0.2em 0.4em;
+			border-radius: 4px;
+
+			html.dark & {
+				background-color: #2d1610;
+				color: #ff8f5e;
+			}
+
+			/* Remove the backticks */
+			&::before,
+			&::after {
+				display: none;
+			}
 		}
 	}
 </style>

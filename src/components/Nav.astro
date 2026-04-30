@@ -3,37 +3,46 @@ import NavLink from './NavLink.astro'
 import ThemeToggle from './ThemeToggle.astro'
 import siteConfig from '../data/site-config'
 import { getLangFromUrl, useTranslations, useTranslatedPath } from '../i18n/utils'
+import LanguagePicker from '../components/LanguagePicker.astro'
 
 const lang = getLangFromUrl(Astro.url)
 const t = useTranslations(lang)
 const translatePath = useTranslatedPath(lang)
 
 const navLinks = siteConfig.headerNavLinks || []
-import LanguagePicker from '../components/LanguagePicker.astro'
+const { variant = 'default' } = Astro.props
+const isRadioVariant = variant === 'radio'
 ---
 
 <nav class='min-h-10 pt-4 pb-12 relative sm:min-h-14 sm:pb-24 md:pt-8'>
-	{
-		navLinks.length > 0 && (
-			<div class='w-full max-w-3xl mx-auto relative'>
+	<div class='w-full max-w-3xl mx-auto relative flex items-center justify-between gap-6'>
+		{
+			navLinks.length > 0 ? (
 				<ul id='menu-items' class='menu flex gap-6'>
 					{navLinks.map(link => (
 						<li class='py-1'>
 							<NavLink
-								class='text-2xl font-serif text-main hover:opacity-80 tracking-normal'
+								class:list={[
+									'text-main hover:opacity-80 tracking-normal',
+									isRadioVariant
+										? 'inline-flex items-center gap-3 text-xl sm:text-2xl font-serif'
+										: 'text-2xl font-serif',
+								]}
 								href={translatePath(link.href)}
 								title={t('nav.home')}
 							>
-								{link.text}
+								{isRadioVariant ? <span class='radio-nav-badge'>lofi radio</span> : link.text}
 							</NavLink>
 						</li>
 					))}
 				</ul>
-			</div>
-		)
-	}
-	<div class='absolute right-0 top-4 z-10 md:top-8 flex gap-4 items-center'>
-		<LanguagePicker />
-		<ThemeToggle />
+			) : (
+				<div />
+			)
+		}
+		<div class='flex gap-4 items-center'>
+			{!isRadioVariant && <LanguagePicker />}
+			<ThemeToggle />
+		</div>
 	</div>
 </nav>

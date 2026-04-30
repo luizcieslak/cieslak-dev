@@ -1,0 +1,185 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { getLangFromUrl, useTranslations } from '../../i18n/utils'
+
+export async function getStaticPaths() {
+	return [{ params: { lang: 'en' } }, { params: { lang: 'pt-br' } }]
+}
+
+const lang = getLangFromUrl(Astro.url)
+const t = useTranslations(lang)
+
+const labels = {
+	play: t('radio.play'),
+	pause: t('radio.pause'),
+	coverSuffix: t('radio.coverSuffix'),
+}
+---
+
+<BaseLayout title={t('radio.title')} description={t('radio.description')} navVariant='radio'>
+	<div
+		id='radio-page-root'
+		data-label-play={labels.play}
+		data-label-pause={labels.pause}
+		data-label-cover-suffix={labels.coverSuffix}
+		class='flex h-[calc(100dvh-4.5rem)] flex-col items-center justify-center px-4 py-2 sm:py-4'
+	>
+		<div class='flex w-full max-w-3xl flex-col items-center justify-center text-center gap-3 sm:gap-4'>
+			<div class='group relative inline-flex items-center justify-center overflow-visible max-w-full'>
+				<img
+					id='radio-cover'
+					src=''
+					alt=''
+					crossorigin='anonymous'
+					class='relative z-[1] h-auto aspect-square w-[min(78vw,420px)] object-cover rounded shadow-lg bg-muted'
+				/>
+				<button
+					id='radio-play'
+					type='button'
+					aria-label={t('radio.play')}
+					class='pointer-events-none absolute z-10 top-1/2 left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-main bg-main/95 p-3 text-main opacity-0 shadow-lg backdrop-blur-sm transition duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 hover:bg-muted focus-visible:pointer-events-auto focus-visible:opacity-100'
+				>
+					<svg
+						id='radio-icon-play'
+						xmlns='http://www.w3.org/2000/svg'
+						width='24'
+						height='24'
+						viewBox='0 0 24 24'
+						fill='currentColor'
+					>
+						<path d='M8 5v14l11-7z'></path>
+					</svg>
+					<svg
+						id='radio-icon-pause'
+						xmlns='http://www.w3.org/2000/svg'
+						width='24'
+						height='24'
+						viewBox='0 0 24 24'
+						fill='currentColor'
+						class='hidden'
+					>
+						<path d='M6 5h4v14H6zM14 5h4v14h-4z'></path>
+					</svg>
+				</button>
+			</div>
+			<div class='flex flex-col items-center w-full max-w-xl pt-0 sm:pt-1'>
+				<h1
+					id='radio-title'
+					class='font-bold leading-tight text-[24px] sm:text-[32px] text-balance [text-shadow:0_2px_18px_rgba(0,0,0,0.35)]'
+				>
+				</h1>
+				<div class='mt-3 flex flex-col items-center gap-1 sm:mt-4 sm:gap-[5px]'>
+					<p id='radio-artist' class='leading-tight text-[16px] sm:text-[24px]'></p>
+					<p class='leading-tight text-[16px] sm:text-[24px] opacity-85'>
+						<em id='radio-album'></em>
+					</p>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<style is:inline>
+		.show-radio-controls > #radio-play {
+			opacity: 1;
+			pointer-events: auto;
+		}
+	</style>
+
+	<script>
+		import { getRadioPlayer } from '../../lib/radio-player'
+		import { mount } from '../../lib/ambient-glow'
+
+		const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
+
+		document.addEventListener('astro:page-load', () => {
+			const root = document.getElementById('radio-page-root')
+			const audio = document.getElementById('radio-audio') as HTMLAudioElement | null
+			if (!root || !audio) return
+
+			const labelPlay = root.dataset.labelPlay || 'Play'
+			const labelPause = root.dataset.labelPause || 'Pause'
+			const labelCoverSuffix = root.dataset.labelCoverSuffix || ''
+
+			const player = getRadioPlayer(audio, RADIO_API)
+
+			const playBtn = document.getElementById('radio-play')!
+			const iconPlay = document.getElementById('radio-icon-play')!
+			const iconPause = document.getElementById('radio-icon-pause')!
+			const coverEl = document.getElementById('radio-cover') as HTMLImageElement
+			const coverFrameEl = coverEl.parentElement!
+			const titleEl = document.getElementById('radio-title')!
+			const artistEl = document.getElementById('radio-artist')!
+			const albumEl = document.getElementById('radio-album')!
+
+			let controlsVisibleTimer: ReturnType<typeof setTimeout> | null = null
+
+			function showControlsTemporarily() {
+				coverFrameEl.classList.add('show-radio-controls')
+				playBtn.classList.remove('pointer-events-none')
+				playBtn.classList.add('pointer-events-auto')
+
+				if (controlsVisibleTimer) clearTimeout(controlsVisibleTimer)
+
+				controlsVisibleTimer = setTimeout(() => {
+					coverFrameEl.classList.remove('show-radio-controls')
+					playBtn.classList.add('pointer-events-none')
+					playBtn.classList.remove('pointer-events-auto')
+					controlsVisibleTimer = null
+				}, 2500)
+			}
+
+			const controller = new AbortController()
+			const { signal } = controller
+
+			playBtn.addEventListener('click', () => player.toggle(), { signal })
+			coverEl.addEventListener('dblclick', () => player.toggle(), { signal })
+			coverEl.addEventListener('click', showControlsTemporarily, { signal })
+
+			const unsubscribe = player.subscribe(state => {
+				const track = state.track
+				titleEl.textContent = track?.title || ''
+				artistEl.textContent = track?.artist || ''
+				albumEl.textContent = track?.album || ''
+				const cover = track?.albumArtUrl || track?.coverUrl || ''
+				if (cover && coverEl.src !== cover) {
+					coverEl.src = cover
+					coverEl.alt = track?.title ? `${track.title} ${labelCoverSuffix}` : ''
+				}
+
+				const showingPlaying = state.wantPlaying
+				playBtn.setAttribute('aria-label', showingPlaying ? labelPause : labelPlay)
+				iconPlay.classList.toggle('hidden', showingPlaying)
+				iconPause.classList.toggle('hidden', !showingPlaying)
+			})
+
+			const glow = mount(coverEl, {
+				binSize: 64,
+				gridSize: 5,
+				blur: 56,
+				sizeMultiplier: 2.05,
+				majorBlobCount: 5,
+				majorBlobOpacity: 0.8,
+				majorBlobRadius: 30,
+				majorBlobFeather: 74,
+				jitter: 22,
+				edgeBleed: 30,
+				horizontalStretch: 1.5,
+				verticalStretch: 1.18,
+				sideBloomCount: 2,
+				sideBloomOpacity: 0.34,
+				sideBloomRadius: 48,
+			})
+
+			document.addEventListener(
+				'astro:before-preparation',
+				() => {
+					if (controlsVisibleTimer) clearTimeout(controlsVisibleTimer)
+					unsubscribe()
+					controller.abort()
+					glow.destroy()
+				},
+				{ once: true },
+			)
+		})
+	</script>
+</BaseLayout>

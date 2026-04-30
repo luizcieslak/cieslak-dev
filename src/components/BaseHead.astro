@@ -19,18 +19,26 @@ const resolvedImage = image?.src
 		}
 	: undefined
 const canonicalURL = new URL(Astro.request.url, Astro.site)
+const locale = Astro.currentLocale === 'pt-br' ? 'pt-br' : 'en'
+const currentOgLocale = locale === 'pt-br' ? 'pt_BR' : 'en_US'
+const alternateOgLocales = locale === 'pt-br' ? ['en_US'] : ['pt_BR']
 
 function getLangAlternates(url: URL) {
 	const path = url.pathname
 	const langs = Object.keys(routes)
+	const [_trailingSlash, currentLang, ...slug] = path.split('/')
+	const slugPath = slug.join('/')
 
-	return langs.map(lang => {
-		const [_trailingSlash, _oldLang, ...slug] = path.split('/')
-		return lang !== _oldLang ? {url: `${url.origin}/${lang}/${slug.join('/')}`, hreflang: lang} : undefined
-	}).filter(Boolean)
+	const alternates = langs.map(lang => {
+		if (lang === currentLang) return { url: formatCanonicalURL(url), hreflang: lang }
+		return { url: formatCanonicalURL(`${url.origin}/${lang}/${slugPath}`), hreflang: lang }
+	})
+
+	return [
+		...alternates,
+		{ url: formatCanonicalURL(`${url.origin}/en/${slugPath}`), hreflang: 'x-default' },
+	]
 }
-
-console.log(getLangAlternates(canonicalURL))
 
 /**
  * Enforce some standard canonical URL formatting across the site.
@@ -60,8 +68,8 @@ function formatCanonicalURL(url: string | URL) {
 
 <!-- Page Metadata -->
 <link rel='canonical' href={formatCanonicalURL(canonicalURL)} />
-{getLangAlternates(canonicalURL).map(alt => <link rel='alternate' href={alt?.url} hreflang={alt?.hreflang}/>)}
-
+{getLangAlternates(canonicalURL).map(alt => <link rel='alternate' href={alt.url} hreflang={alt.hreflang} />)}
+<meta name='robots' content='index,follow' />
 <meta name='description' content={description} />
 
 <!-- Open Graph / Facebook -->
@@ -69,6 +77,8 @@ function formatCanonicalURL(url: string | URL) {
 <meta property='og:url' content={formatCanonicalURL(canonicalURL)} />
 <meta property='og:title' content={title} />
 <meta property='og:description' content={description} />
+<meta property='og:locale' content={currentOgLocale} />
+{alternateOgLocales.map(ogLocale => <meta property='og:locale:alternate' content={ogLocale} />)}
 {resolvedImage?.src && <meta property='og:image' content={resolvedImage.src} />}
 {resolvedImage?.alt && <meta property='og:image:alt' content={resolvedImage.alt} />}
 

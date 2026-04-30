@@ -1,0 +1,182 @@
+---
+import { getLangFromUrl, useTranslations } from '../i18n/utils'
+
+const lang = getLangFromUrl(Astro.url)
+const t = useTranslations(lang)
+
+const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
+const labels = {
+	play: t('radio.play'),
+	pause: t('radio.pause'),
+	open: t('radio.title'),
+}
+---
+
+<div
+	id='radio-miniplayer'
+	transition:persist='radio-miniplayer'
+	data-radio-api={RADIO_API}
+	data-label-play={labels.play}
+	data-label-pause={labels.pause}
+	class='fixed inset-x-0 bottom-0 z-40 hidden overflow-hidden border-t border-main/20 bg-main/95 backdrop-blur-md md:inset-x-auto md:bottom-4 md:left-auto md:right-4 md:max-w-sm md:rounded-full md:border md:shadow-lg data-[visible=true]:flex'
+>
+	<div
+		class='relative z-10 mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-2 sm:gap-4 sm:py-3 md:mx-0 md:gap-2 md:px-2 md:py-1.5'
+	>
+		<a
+			id='radio-miniplayer-link'
+			href={`/${lang}/radio`}
+			class='flex min-w-0 flex-1 items-center gap-3 hover:opacity-80 sm:gap-4 md:gap-2'
+			aria-label={labels.open}
+		>
+			<span
+				id='radio-miniplayer-cover-frame'
+				class='relative flex-none h-10 w-10 sm:h-12 sm:w-12 md:h-9 md:w-9'
+			>
+				<img
+					id='radio-miniplayer-cover'
+					src=''
+					alt=''
+					crossorigin='anonymous'
+					class='relative z-[1] block h-full w-full rounded bg-muted object-cover md:rounded-full'
+				/>
+			</span>
+			<div class='min-w-0 flex-1 text-left'>
+				<p
+					id='radio-miniplayer-title'
+					class='truncate text-sm font-medium leading-tight sm:text-base md:text-xs'
+				>
+				</p>
+				<p
+					id='radio-miniplayer-artist'
+					class='truncate text-xs leading-tight opacity-70 sm:text-sm md:text-[11px]'
+				>
+				</p>
+			</div>
+		</a>
+		<button
+			id='radio-miniplayer-toggle'
+			type='button'
+			aria-label={labels.play}
+			class='inline-flex h-10 w-10 flex-none items-center justify-center rounded-full border border-main bg-main/95 text-main shadow-sm transition hover:bg-muted md:h-8 md:w-8'
+		>
+			<svg
+				id='radio-miniplayer-icon-play'
+				xmlns='http://www.w3.org/2000/svg'
+				viewBox='0 0 24 24'
+				fill='currentColor'
+				class='h-5 w-5 md:h-4 md:w-4'
+			>
+				<path d='M8 5v14l11-7z'></path>
+			</svg>
+			<svg
+				id='radio-miniplayer-icon-pause'
+				xmlns='http://www.w3.org/2000/svg'
+				viewBox='0 0 24 24'
+				fill='currentColor'
+				class='hidden h-5 w-5 md:h-4 md:w-4'
+			>
+				<path d='M6 5h4v14H6zM14 5h4v14h-4z'></path>
+			</svg>
+		</button>
+	</div>
+</div>
+
+<audio id='radio-audio' transition:persist='radio-audio' preload='none'></audio>
+
+<script>
+	import { getRadioPlayer } from '../lib/radio-player'
+	import { mount } from '../lib/ambient-glow'
+
+	const RADIO_PATH_RE = /\/(en|pt-br)\/radio\/?$/
+
+	function applyVisibility(root: HTMLElement) {
+		const onRadioPage = root.dataset.onRadio === 'true'
+		const hasInteracted = root.dataset.hasInteracted === 'true'
+		root.dataset.visible = !onRadioPage && hasInteracted ? 'true' : 'false'
+	}
+
+	function updateRouteVisibility() {
+		const root = document.getElementById('radio-miniplayer')
+		if (!root) return
+		root.dataset.onRadio = RADIO_PATH_RE.test(location.pathname) ? 'true' : 'false'
+		applyVisibility(root)
+	}
+
+	function updateLocalizedLink() {
+		const link = document.getElementById('radio-miniplayer-link')
+		if (!link) return
+		const lang = location.pathname.split('/')[1] === 'pt-br' ? 'pt-br' : 'en'
+		link.setAttribute('href', `/${lang}/radio`)
+	}
+
+	declare global {
+		interface Window {
+			__radioMiniplayerBound?: boolean
+		}
+	}
+
+	document.addEventListener('astro:page-load', () => {
+		updateRouteVisibility()
+		updateLocalizedLink()
+
+		if (window.__radioMiniplayerBound) return
+		window.__radioMiniplayerBound = true
+
+		const audio = document.getElementById('radio-audio') as HTMLAudioElement | null
+		const root = document.getElementById('radio-miniplayer')
+		if (!audio || !root) return
+
+		const api = root.dataset.radioApi || ''
+		const labelPlay = root.dataset.labelPlay || 'Play'
+		const labelPause = root.dataset.labelPause || 'Pause'
+
+		const player = getRadioPlayer(audio, api)
+
+		const titleEl = document.getElementById('radio-miniplayer-title')!
+		const artistEl = document.getElementById('radio-miniplayer-artist')!
+		const coverEl = document.getElementById('radio-miniplayer-cover') as HTMLImageElement
+		const toggleBtn = document.getElementById('radio-miniplayer-toggle')!
+		const iconPlay = document.getElementById('radio-miniplayer-icon-play')!
+		const iconPause = document.getElementById('radio-miniplayer-icon-pause')!
+
+		mount(coverEl, {
+			blur: 8,
+			sizeMultiplier: 3.6,
+			majorBlobCount: 4,
+			majorBlobOpacity: 0.6,
+			majorBlobRadius: 32,
+			majorBlobFeather: 70,
+			jitter: 14,
+			edgeBleed: 24,
+			horizontalStretch: 1.4,
+			verticalStretch: 1.05,
+			sideBloomCount: 1,
+			sideBloomOpacity: 0.28,
+			sideBloomRadius: 40,
+		})
+
+		toggleBtn.addEventListener('click', e => {
+			e.preventDefault()
+			player.toggle()
+		})
+
+		player.subscribe(state => {
+			const track = state.track
+			titleEl.textContent = track?.title || ''
+			artistEl.textContent = track?.artist || ''
+			const cover = track?.albumArtUrl || track?.coverUrl || ''
+			if (cover && coverEl.src !== cover) {
+				coverEl.src = cover
+				coverEl.alt = track?.title || ''
+			}
+			root.dataset.hasInteracted = state.hasInteracted ? 'true' : 'false'
+			applyVisibility(root)
+
+			const showingPlaying = state.wantPlaying
+			toggleBtn.setAttribute('aria-label', showingPlaying ? labelPause : labelPlay)
+			iconPlay.classList.toggle('hidden', showingPlaying)
+			iconPause.classList.toggle('hidden', !showingPlaying)
+		})
+	})
+</script>
