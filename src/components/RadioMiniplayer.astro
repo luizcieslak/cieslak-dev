@@ -93,13 +93,15 @@ const labels = {
 	function applyVisibility(root: HTMLElement) {
 		const onRadioPage = root.dataset.onRadio === 'true'
 		const hasInteracted = root.dataset.hasInteracted === 'true'
-		root.dataset.visible = !onRadioPage && hasInteracted ? 'true' : 'false'
+		const calloutInView = (Number(root.dataset.calloutsInView) || 0) > 0
+		root.dataset.visible = !onRadioPage && hasInteracted && !calloutInView ? 'true' : 'false'
 	}
 
 	function updateRouteVisibility() {
 		const root = document.getElementById('radio-miniplayer')
 		if (!root) return
 		root.dataset.onRadio = RADIO_PATH_RE.test(location.pathname) ? 'true' : 'false'
+		root.dataset.calloutsInView = '0'
 		applyVisibility(root)
 	}
 
@@ -113,7 +115,16 @@ const labels = {
 	declare global {
 		interface Window {
 			__radioMiniplayerBound?: boolean
+			__radioMiniplayerCalloutDelta?: (delta: number) => void
 		}
+	}
+
+	window.__radioMiniplayerCalloutDelta = (delta: number) => {
+		const root = document.getElementById('radio-miniplayer')
+		if (!root) return
+		const next = Math.max(0, (Number(root.dataset.calloutsInView) || 0) + delta)
+		root.dataset.calloutsInView = String(next)
+		applyVisibility(root)
 	}
 
 	document.addEventListener('astro:page-load', () => {
