@@ -99,6 +99,10 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		const next = activeKey === 'a' ? layerB : layerA
 		const prev = activeKey === 'a' ? layerA : layerB
 		next.style.background = gradient
+		// Force a reflow so the browser commits the layer's starting opacity
+		// before we change it — otherwise the first apply (just after mount)
+		// snaps to 0.8 without animating.
+		void next.offsetHeight
 		next.style.opacity = '0.8'
 		prev.style.opacity = '0'
 		activeKey = activeKey === 'a' ? 'b' : 'a'

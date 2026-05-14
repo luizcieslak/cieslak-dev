@@ -76,7 +76,35 @@ const labelPause = t('radio.pause')
 
 		const player = getRadioPlayer(audio, RADIO_API)
 
+		const inViewState = new WeakMap<Element, boolean>()
+		const observer = new IntersectionObserver(
+			entries => {
+				for (const entry of entries) {
+					const wasInView = inViewState.get(entry.target) === true
+					const isInView = entry.isIntersecting
+					if (wasInView === isInView) continue
+					inViewState.set(entry.target, isInView)
+					window.__radioMiniplayerCalloutDelta?.(isInView ? 1 : -1)
+				}
+			},
+			{ rootMargin: '-40px 0px' },
+		)
+
+		document.addEventListener(
+			'astro:before-preparation',
+			() => {
+				for (const callout of callouts) {
+					if (inViewState.get(callout) === true) {
+						window.__radioMiniplayerCalloutDelta?.(-1)
+					}
+				}
+				observer.disconnect()
+			},
+			{ once: true },
+		)
+
 		callouts.forEach(callout => {
+			observer.observe(callout)
 			const labelPlay = callout.dataset.labelPlay || 'Play'
 			const labelPause = callout.dataset.labelPause || 'Pause'
 			const toggleBtn = callout.querySelector<HTMLButtonElement>('.radio-callout-toggle')!
