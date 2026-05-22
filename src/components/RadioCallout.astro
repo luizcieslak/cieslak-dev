@@ -9,10 +9,13 @@ const labelPause = t('radio.pause')
 ---
 
 <aside
-	class='radio-callout my-10 mx-auto flex w-max min-w-[230px] items-center rounded-lg border border-main/20 bg-muted/40 px-3 py-2 not-prose'
+	class='radio-callout relative my-10 mx-auto flex max-w-[300px] items-center rounded-lg border border-main/20 bg-muted/40 px-3 py-2 not-prose'
 	data-label-play={labelPlay}
 	data-label-pause={labelPause}
 >
+	<span class='radio-callout-glow-anchor pointer-events-none' aria-hidden='true'>
+		<img class='radio-callout-glow-source' src='' alt='' crossorigin='anonymous' />
+	</span>
 	<button
 		class='radio-callout-toggle relative z-[2] inline-flex h-12 w-12 flex-none items-center justify-center rounded-full border border-main bg-main/95 text-main shadow-sm transition hover:bg-muted'
 		type='button'
@@ -39,7 +42,10 @@ const labelPause = t('radio.pause')
 			<path d='M6 5h4v14H6zM14 5h4v14h-4z'></path>
 		</svg>
 	</button>
-	<div class='radio-callout-now-playing flex min-w-0 items-center gap-3'>
+	<span class='radio-callout-label radio-nav-badge whitespace-nowrap !border-0 px-8 text-base'
+		>lofi radio</span
+	>
+	<div class='radio-callout-now-playing relative z-[1] flex min-w-0 items-center gap-3'>
 		<span class='radio-callout-cover-frame relative flex-none h-12 w-12'>
 			<img
 				class='radio-callout-track-cover relative z-[1] block h-full w-full rounded bg-muted object-cover'
@@ -56,6 +62,18 @@ const labelPause = t('radio.pause')
 </aside>
 
 <style is:inline>
+	.radio-callout-label {
+		max-width: 200px;
+		overflow: hidden;
+		transition:
+			max-width 500ms cubic-bezier(0.4, 0, 0.2, 1),
+			padding 500ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.radio-callout[data-has-track='true'] .radio-callout-label {
+		max-width: 0;
+		padding: 0;
+		opacity: 0;
+	}
 	.radio-callout-now-playing {
 		max-width: 0;
 		opacity: 0;
@@ -70,6 +88,31 @@ const labelPause = t('radio.pause')
 		max-width: 320px;
 		opacity: 1;
 		padding-left: 0.75rem;
+	}
+
+	/* Phantom anchor positioned over where the album cover renders.
+	   Sits outside the overflow-hidden now-playing block so the glow
+	   layers can extend far beyond the callout boundary. */
+	.radio-callout-glow-anchor {
+		position: absolute;
+		top: 50%;
+		left: calc(0.75rem + 3rem + 0.75rem); /* aside padding + button + gap */
+		width: 3rem;
+		height: 3rem;
+		transform: translateY(-50%);
+		z-index: 0;
+		opacity: 0;
+		transition: opacity 600ms ease;
+	}
+	.radio-callout[data-has-track='true'] .radio-callout-glow-anchor {
+		opacity: 1;
+	}
+	.radio-callout-glow-source {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		visibility: hidden;
 	}
 </style>
 
@@ -125,21 +168,22 @@ const labelPause = t('radio.pause')
 			const titleEl = callout.querySelector<HTMLElement>('.radio-callout-track-title')!
 			const artistEl = callout.querySelector<HTMLElement>('.radio-callout-track-artist')!
 			const coverEl = callout.querySelector<HTMLImageElement>('.radio-callout-track-cover')!
+			const glowSourceEl = callout.querySelector<HTMLImageElement>('.radio-callout-glow-source')!
 
-			const glow = mount(coverEl, {
-				blur: 10,
-				sizeMultiplier: 3.8,
-				majorBlobCount: 4,
-				majorBlobOpacity: 0.65,
-				majorBlobRadius: 32,
-				majorBlobFeather: 72,
-				jitter: 16,
-				edgeBleed: 26,
-				horizontalStretch: 1.45,
-				verticalStretch: 1.1,
+			const glow = mount(glowSourceEl, {
+				blur: 20,
+				sizeMultiplier: 6,
+				verticalStretch: 2,
+				majorBlobCount: 50,
+				majorBlobOpacity: 0.72,
+				majorBlobRadius: 26,
+				majorBlobFeather: 12,
+				jitter: 4,
+				edgeBleed: 2,
+				horizontalStretch: 1,
 				sideBloomCount: 2,
-				sideBloomOpacity: 0.32,
-				sideBloomRadius: 42,
+				sideBloomOpacity: 0.38,
+				sideBloomRadius: 2,
 			})
 
 			const controller = new AbortController()
@@ -161,6 +205,9 @@ const labelPause = t('radio.pause')
 					if (cover && coverEl.src !== cover) {
 						coverEl.src = cover
 						coverEl.alt = track.title || ''
+					}
+					if (cover && glowSourceEl.src !== cover) {
+						glowSourceEl.src = cover
 					}
 					callout.dataset.hasTrack = 'true'
 				} else {
