@@ -60,6 +60,21 @@ const DEFAULTS: Required<GlowOptions> = {
 	sideBloomRadius: 42,
 }
 
+export function extractColors(img: HTMLImageElement, userOptions: GlowOptions = {}): Array<Rgb | null> {
+	if (!img.naturalWidth) return []
+	const opts: Required<GlowOptions> = { ...DEFAULTS, ...userOptions }
+	const canvas = document.createElement('canvas')
+	const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+	canvas.width = img.naturalWidth
+	canvas.height = img.naturalHeight
+	try {
+		ctx.drawImage(img, 0, 0)
+	} catch {
+		return []
+	}
+	return extractGridColors(ctx, opts)
+}
+
 export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): GlowHandle {
 	const parent = img.parentElement
 	if (!parent) throw new Error('ambient-glow: img must be attached to the DOM before mount()')

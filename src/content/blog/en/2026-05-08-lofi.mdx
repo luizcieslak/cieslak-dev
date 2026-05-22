@@ -8,9 +8,11 @@ seo:
     alt: The classic "LoFi Girl" image but with a reinterpretation of it if she lived in Brazil.
 ---
 import RadioCallout from '../../../components/RadioCallout.astro'
+import AmbientGlowSandbox from '../../../components/AmbientGlowSandbox.astro'
+import AmbientPaletteSandbox from '../../../components/AmbientPaletteSandbox.astro'
 
 
-![The classic "LoFi Girl" image but with a reinterpretation of its art imagining if she lived in Brazil.](/lofi.png)
+![The classic "LoFi Girl" image but with a reinterpretation of its art imagining if she lived in Brazil.](/lofi/lofi.png)
 
 I like LoFi music.
 
@@ -29,13 +31,63 @@ To continue reading to this article, I invite you to turn it on below so we can 
 <RadioCallout />
 
 
-# Lofi radio
+# How a (lofi) radio could work
+
+![Diagram of how the radio is working](/lofi/diagram.png)
+
+This below is the diagram of how it is working right now. All the code used here is open source on this repositories
+
+* [this blog here or lofi.md]() The client side consuming the audio stream and interacting with the server via HTTP requests and SSE.
+* [lofi-radio]() Server aplication using Bun. Store the files, streams the audio and holds the Admin UI.
+* [shelf]() Playist management and replication in music apps like Spotify and YouTube Music.
+
+We will deep dive in each of these parts in the following sections.
+
 
 # Client side
 
-the radio player
-ambient-glow example with slider to control output
-radio page
+The client side consumes 2 APIS
+
+* Audio stream via HTTP request that return a stream of bytes.
+* Metadata information about the track via Server Sent Events (SSE). It pings the client with the information about the current track being played and changes every time the track changes.
+
+If you played the radio in the callout above, you probably are seeing them already either in the right side of the screen or on the bottom if you are on mobile.
+
+The `audio` tag itself is straightforward from this point. But we also have custom logic built on top of it to handle server reconnections, preventing the screen to lock for mobile browsers and pushing metadata using [api media]()
+
+## Album cover and blur gradient
+
+I believe artist but great thought into the album cover of their releases. I believe the intention is to see it alongside the playing track. some of them are pretty dope as well.
+
+Thinking about that, **the most important element on the radio page is the album cover**. It is the biggest element and around it I've built a custom blur gradient effect from the colors that are extracted from the image.
+
+The whole effect lives in [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). At a high level it samples the cover image on a small grid, picks one dominant color per cell, and paints a stack of soft radial gradients on layers sitting behind the image. Have a play with the controls below — every slider maps directly to a field of `GlowOptions` that the radio page passes into `mount()`.
+
+<AmbientGlowSandbox />
+
+### How colors are extracted
+
+For each cell in the sampling grid the code calls `dominantColor()`, which is just a histogram with three escape hatches. It walks the pixel buffer four bytes at a time, drops anything that's too transparent, too dark, or too bright via a simple luminance check, and then bins what's left into coarse RGB buckets:
+
+```ts
+const lum = 0.299 * r + 0.587 * g + 0.114 * b
+if (skipBlack && lum < blackThreshold) continue
+if (skipWhite && lum > whiteThreshold) continue
+const key = `${Math.floor(r / binSize)},${Math.floor(g / binSize)},${Math.floor(b / binSize)}`
+counts.set(key, (counts.get(key) || 0) + 1)
+```
+
+The bucket with the highest count wins, and its center is reconstructed back into an `{ r, g, b }` triplet. `binSize` controls how forgiving the buckets are — large bins merge close shades into one dominant color, small bins preserve fine variation at the cost of fragmenting the vote. The black/white skips exist because letterboxing and bright backgrounds otherwise dominate the count and drain the gradient of the colors that actually matter.
+
+Here's the same algorithm running on a 4×4 grid so you can see the palette it picks:
+
+<AmbientPaletteSandbox />
+
+What is crazy for me is that the exact same algorithm that can be used to pixelize an image if you go long enough increasing the grid size. 
+
+{/* <add gif here> */}
+ 
+Nowadays with Ultra HD 8k screens it is easy to forget the image we see in front of us in a computer is a grid of pixels, but we are actually seeing billions of them at every single frame.
 
 # Server side
 
