@@ -94,16 +94,65 @@ Nowadays with Ultra HD 8k screens it is easy to forget the image we see in front
 
 # Server side
 
-nodejs app explanation
-open source link
+
+state json explanation
+resilience when restarting or crash
+playlist state
+
+## something every 26ms
+
+Not exactly every 26ms, but that number is coming from how we parse the MP3 frames.
+
+So, a little back in history: The MP3 format itself is widely used to store and transport audio files. It is very efficient to compress an audio file size while maintaing the quality.
+
+Inside the MP3 format, there are several ways of compressing the data. the most used of them, MPEG-1 Layer 3, is a lossy compression that is very efficient in terms of compression ratio.
+
+(need to also explain about the 44.1kHz sampling rate)
+
+For each frame of an audio, it stores exactly 1152 audio samples. Therefore, if the track has 44.1kHz sampling rate, and MPEG-1 Layer 3 holds 1152 samples, each frame duration is ~26ms (need fuurther explanation about the frame duration, still confusing af).
+
+explain how a stream server works. like someone giving cards into a table. every player should have the same amount of cards at the same time. a radio transmission works like that, where you need to tune into a station and then receive the broadcast from it.
+
+explain we need to respect that number in streaming. why setTimeout() can't be used. 
+need the PreciseTimer to be able to respond in the sub-millisecond range.
+
+setTimeout works in a best-effort way when it comes to precise milliseconds. It can't guarantee something will way to be executed in exact 26ms. It can be 26, 24, 32ms, depending how soon the CPU can handle that process. We gotta remind ourselves that server aplications are CPU-bound and therefore share the Operational System resources like any other process running alongside it.
+
+
+
 visuals? how mp3 frame parser works, timer stuff
 maybe a visualizer on each frame, dunno
 stream and sse events
 
 
-player gotchas
+# Files
 
-# Playlist management
+In this current version of the radio, it only supports MP3 files.
+
+
+# Shelf for Playlist management
+
+The playlist you can hear here is also avaible in Spotify and YouTube Music. 
+This section now goes how can we use a tool named Shelf that can sync the playlist state between the apps with an ability to export it in order to file, which we use at the lofi-server.
+
+
+
+I used spotify to search, organize and add songs to the playlist originally. Its just easier to use overall and then when we connect it to Shelf:
+
+image1
+
+we are able to export the playlist as a json file and also sync it songs between Spotify and other apps like YouTube Music.
+
+image2
+
+
+
+## How to sync the playlists between local, Spotify and YouTube Music
+
+shelf to sync
+
+
+
 
 admin page in server
 shelf? maybe
