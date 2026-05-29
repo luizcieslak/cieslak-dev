@@ -1,5 +1,5 @@
 ---
-title: Contruindo uma rádio LoFi
+title: Construindo uma rádio LoFi
 excerpt: Depois de ouvir muito LoFi por aí, decidi criar minha própria rádio.
 publishDate: '2026-05-08'
 seo:
@@ -56,19 +56,19 @@ A tag [audio](https://developer.mozilla.org/pt-BR/docs/Web/HTML/Reference/Elemen
 
 Por fim, também possui mecanismos para a tela não apagar em celulares e também usa a [MediaSession API](https://developer.mozilla.org/pt-BR/docs/Web/API/MediaSession) para transmitir as informações para os dispositivos, assim conseguimos ver o nome da música e artista no rádio do carro ou na tela do celular quando na tela de desbloqueio.
 
-## Album cover and blur gradient
+## Capas de álbuns e gradiente esfumaçado
 
-I believe artist but great thought into the album cover of their releases. I believe the intention is to see it alongside the playing track. some of them are pretty dope as well.
+Visualizar as capas de álbuns _enquanto_ a música toca é parte essencial da experiência. A arte de capa não esta ali por acaso geralmente e é criada das mesma maneira que as músicas são.
 
-Thinking about that, **the most important element on the radio page is the album cover**. It is the biggest element and around it I've built a custom blur gradient effect from the colors that are extracted from the image.
+Usando isso como base, temos que **o elemento mais importante na página do rádio é essa capa.** É o maior elemento da página e em volta dela há um efeito gradiente de _blur_ das cores que são extraídas da imagem.
 
-The whole effect lives in [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). At a high level it samples the cover image on a small grid, picks one dominant color per cell, and paints a stack of soft radial gradients on layers sitting behind the image. Have a play with the controls below — every slider maps directly to a field of `GlowOptions` that the radio page passes into `mount()`.
+O efeito se chama `AmbientGlow` e fica no arquivo [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). Resumido, o efeito coloca a imagem em uma grade, extrai a cor predominante em cada segmento e desenha camadas de gradiente circulares atrás da imagem. Dê uma fuçada com os controles abaixo, cada _slider_ controla um dos argumentos de `GlowOptions` que o rádio passa na função de `mount()`. 
 
 <AmbientGlowSandbox />
 
-### How colors are extracted
+### Como as cores são extraídas
 
-For each cell in the sampling grid the code calls `dominantColor()`, which is just a histogram with three escape hatches. It walks the pixel buffer four bytes at a time, drops anything that's too transparent, too dark, or too bright via a simple luminance check, and then bins what's left into coarse RGB buckets:
+Para cada "quadradinho" na imagem transformada em grade, o código chama `dominantColor()`, que faz um histograma dividindo os pixels em 3 cestas. A função anda por todos os pixels, 4 bytes por vez, filtrando todos que são muito transparentes, muito escuro ou muito brilhantes através uma verificação da _luminance_ da cor e por fim separando o que sobrou em nessas 3 cestas no formato RGB (uma para cada cor primária: vermelho, verde e azul).
 
 ```ts
 const lum = 0.299 * r + 0.587 * g + 0.114 * b
@@ -78,36 +78,38 @@ const key = `${Math.floor(r / binSize)},${Math.floor(g / binSize)},${Math.floor(
 counts.set(key, (counts.get(key) || 0) + 1)
 ```
 
-The bucket with the highest count wins, and its center is reconstructed back into an `{ r, g, b }` triplet. `binSize` controls how forgiving the buckets are — large bins merge close shades into one dominant color, small bins preserve fine variation at the cost of fragmenting the vote. The black/white skips exist because letterboxing and bright backgrounds otherwise dominate the count and drain the gradient of the colors that actually matter.
+A cesta com maior número vence, e sua cor é reconstituída também em uma configuração tripla de `{ r, g, b }`. A variável `binSize` controla o quão "grande" são essas cestas: quanto maior são, mais cores e tons parecidos são unificados em uma cor dominante, cestas pequenas preservam as pequenas variações de cor ao custo de fragmentar a votação da cor dominante. Os filtros de preto e branco existem porque geralmente fundos muito claros ou muito escuros dominariam sempre na contagem e portanto removeriam as cores importantes do gradiente, que são justamente o que estamos procurando no algoritmo.
 
-Here's the same algorithm running on a 4×4 grid so you can see the palette it picks:
+Exemplo do algoritmo rodando em uma grade 4x4 para que na prática vemos quais são essas cores.
 
 <AmbientPaletteSandbox />
 
-What is crazy for me is that the exact same algorithm that can be used to pixelize an image if you go long enough increasing the grid size. 
+O que é muito louco pra mim é que esse algoritmo pode ser usado para "pixelar" uma imagem se vc for longe aumentando o tamanho da grade:
 
 {/* <add gif here> */}
- 
-Nowadays with Ultra HD 8k screens it is easy to forget the image we see in front of us in a computer is a grid of pixels, but we are actually seeing billions of them at every single frame.
 
-# Server side
+Hoje em dia com monitores super tecnológicos rodando até em resoluções Ultra HD 8k é dificil de lembrar que o que está na nossa frente é de fato uma grade de pixels, muitos pixels, na verdade bilhões de pixels que passam na tela a cada segundo.
+
+# Parte do servidor
 
 
 state json explanation
 resilience when restarting or crash
 playlist state
 
-## something every 26ms
+## Algo enviado a cada 26ms
 
-Not exactly every 26ms, but that number is coming from how we parse the MP3 frames.
+Não exatamente a cada 26 milissegundos, mas esse número vem de como lemos os _frames_ de um arquivo MP3.
 
-So, a little back in history: The MP3 format itself is widely used to store and transport audio files. It is very efficient to compress an audio file size while maintaing the quality.
+Voltando um pouco na história da internet: Os arquivos MP3 quando lançado revolucionou o jeito em que lidávamos com audio com uma eficiente compressão de tamanho enquanto mantém uma ótima qualidade de som.
 
-Inside the MP3 format, there are several ways of compressing the data. the most used of them, MPEG-1 Layer 3, is a lossy compression that is very efficient in terms of compression ratio.
+(quem tinha um desses aparelhos sabe o que eu estou falando)
+
+Dentro do formato MP3, há varios tipos de compressão de dados. A mais utilizada se chama _MPEG-1 Layer 3_, que é justamente a compressão que perde um pouco da qualidade da música mas que é tem um tamanho bem enxuto.
 
 (need to also explain about the 44.1kHz sampling rate)
 
-For each frame of an audio, it stores exactly 1152 audio samples. Therefore, if the track has 44.1kHz sampling rate, and MPEG-1 Layer 3 holds 1152 samples, each frame duration is ~26ms (need fuurther explanation about the frame duration, still confusing af).
+Para cada _frame_ de um áudio, ele armazena exatamente 1152 "pedaços" de áudio. POrtanto, se a música tem um _sampling rate_ de 44.1 kHz, cada frame precisa ter uma duração de 26ms (calc).
 
 explain how a stream server works. like someone giving cards into a table. every player should have the same amount of cards at the same time. a radio transmission works like that, where you need to tune into a station and then receive the broadcast from it.
 
@@ -123,27 +125,21 @@ maybe a visualizer on each frame, dunno
 stream and sse events
 
 
-# Files
+# arquivos
 
-In this current version of the radio, it only supports MP3 files.
+Nessa versão atual da rádio, apenas o arquivo MP3 é suportado. O suporte de outras extensões e formatos requerem que a mesmo algoritmo que determina a duração de um _frame_ seja replicada para eles, para que a cadência de frames transmitidos na _stream_ seja constante.
 
+# Shelf para gerenciamento de playlists.
 
-# Shelf for Playlist management
+As músicas que vc ouve aqui também estão disponíveis no Spotify e YouTube Music. Nessa parte explico rápidamente como a gente pode usar uma ferramenta como essa que consegue sincronizar a mesma playlist não só entre essas plataformas mas também pode exportar a definição da playlist em um arquivo local, o qual usamos no servidor.
 
-The playlist you can hear here is also avaible in Spotify and YouTube Music. 
-This section now goes how can we use a tool named Shelf that can sync the playlist state between the apps with an ability to export it in order to file, which we use at the lofi-server.
-
-
-
-I used spotify to search, organize and add songs to the playlist originally. Its just easier to use overall and then when we connect it to Shelf:
+Eu usei a API do Spotify para procurar, adicionar e organizar as músicas na playlist originalmente porque é o aplicativo que mais uso no momento. Depois, conectamos a conta no Shelf:
 
 image1
 
-we are able to export the playlist as a json file and also sync it songs between Spotify and other apps like YouTube Music.
+É possivel exportar a playlist em um arquivo JSON e também sincronizar automaticamente quando se adiciona uma nova música entre as plataformas:
 
 image2
-
-
 
 ## How to sync the playlists between local, Spotify and YouTube Music
 

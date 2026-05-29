@@ -61,11 +61,11 @@ The [audio](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements
 Finally, we also have custom logic to prevent the screen to lock for mobile browsers and push metadata using [MediaSession API](https://developer.mozilla.org/en-US/docs/Web/API/MediaSession) to devices, so the information is visible in radio cars or lock screen in mobiles for example.
 ## Album cover and blur gradient
 
-I believe artist put great thought into the album cover of their releases. I believe the intention is to see it alongside the playing track. some of them are pretty dope as well.
+I believe artists put great thought into the album cover of their releases and the intention is to visualize it alongside the playing track. some of them are pretty dope as well.
 
-Thinking about that, **the most important element on the radio page is the album cover**. It is the biggest element and around it I've built a custom blur gradient effect from the colors that are extracted from the image.
+Thinking about that, **the most important element on the radio page should be the album cover**. It is the biggest element there and around it there is a custom blur gradient effect from the colors that are extracted from the image.
 
-The whole effect lives in [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). At a high level it samples the cover image on a small grid, picks one dominant color per cell, and paints a stack of soft radial gradients on layers sitting behind the image. Have a play with the controls below — every slider maps directly to a field of `GlowOptions` that the radio page passes into `mount()`.
+The effect lives in [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). At a high level it samples the cover image on a small grid, picks one dominant color per cell, and paints a stack of soft radial gradients on layers sitting behind the image. Have a play with the controls below — every slider maps directly to a field of `GlowOptions` that the radio page passes into `mount()`.
 
 <AmbientGlowSandbox />
 
@@ -128,17 +128,17 @@ stream and sse events
 
 # Files
 
-In this current version of the radio, it only supports MP3 files.
+In this current version of the radio, it only supports MP3 files. In order to support more extensions, the same algorithm to determine the frame duration would need to be replicated to them so the frames constant cadence is maintainted in the stream level.
 
 
 # Shelf for Playlist management
 
 The playlist you can hear here is also avaible in Spotify and YouTube Music. 
-This section now goes how can we use a tool named Shelf that can sync the playlist state between the apps with an ability to export it in order to file, which we use at the lofi-server.
+This section now goes how can we use a tool named Shelf that can sync the playlist state between the apps with an ability to export it in order to file, which we use at the lofi-radio server.
 
 
 
-I used spotify to search, organize and add songs to the playlist originally. Its just easier to use overall and then when we connect it to Shelf:
+I used spotify to search, add and organize songs to the playlist originally because is my main songs app at the moment. Then, we connect our account into Shelf like: 
 
 image1
 
