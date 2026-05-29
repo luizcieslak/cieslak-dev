@@ -53,8 +53,8 @@ const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Color palette extraction 
 	function render(host: HTMLElement, colors: Array<Rgb | null>, gridSize: number) {
 		host.style.gridTemplateColumns = `repeat(${gridSize}, minmax(0, 1fr))`
 		host.style.gridTemplateRows = `repeat(${gridSize}, minmax(0, 1fr))`
-		host.innerHTML = ''
 		const showLabel = gridSize <= 6
+		const fragment = document.createDocumentFragment()
 		colors.forEach(color => {
 			const cell = document.createElement('div')
 			cell.className = 'relative flex items-end justify-center'
@@ -68,8 +68,9 @@ const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Color palette extraction 
 				cell.style.background = 'transparent'
 				cell.innerHTML = showLabel ? '<span class="m-1 text-[10px] opacity-50">—</span>' : ''
 			}
-			host.appendChild(cell)
+			fragment.appendChild(cell)
 		})
+		host.replaceChildren(fragment)
 	}
 
 	document.addEventListener('astro:page-load', () => {
@@ -85,19 +86,27 @@ const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Color palette extraction 
 			const gridSizeInput = root.querySelector<HTMLInputElement>('.ambient-palette-sandbox-grid-size')!
 			const gridSizeOut = root.querySelector<HTMLElement>('.ambient-palette-sandbox-grid-size-out')!
 
+			let pendingFrame: number | null = null
+
 			const update = () => {
+				pendingFrame = null
 				const gridSize = parseInt(gridSizeInput.value, 10)
 				gridSizeOut.textContent = `${gridSize}×${gridSize}`
 				const colors = extractColors(img, { gridSize })
 				render(host, colors, gridSize)
 			}
 
+			const scheduleUpdate = () => {
+				if (pendingFrame !== null) return
+				pendingFrame = requestAnimationFrame(update)
+			}
+
 			const controller = new AbortController()
 			const { signal } = controller
 
-			img.addEventListener('load', update, { signal })
-			gridSizeInput.addEventListener('input', update, { signal })
-			if (img.complete && img.naturalWidth) update()
+			img.addEventListener('load', scheduleUpdate, { signal })
+			gridSizeInput.addEventListener('input', scheduleUpdate, { signal })
+			if (img.complete && img.naturalWidth) scheduleUpdate()
 
 			let lastObjectUrl: string | null = null
 			upload.addEventListener(
@@ -115,6 +124,7 @@ const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Color palette extraction 
 
 			cleanups.push(() => {
 				controller.abort()
+				if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
 				if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl)
 			})
 		})

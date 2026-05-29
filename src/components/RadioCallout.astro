@@ -171,19 +171,19 @@ const labelPause = t('radio.pause')
 			const glowSourceEl = callout.querySelector<HTMLImageElement>('.radio-callout-glow-source')!
 
 			const glow = mount(glowSourceEl, {
-				blur: 20,
-				sizeMultiplier: 6,
-				verticalStretch: 2,
-				majorBlobCount: 50,
-				majorBlobOpacity: 0.72,
-				majorBlobRadius: 26,
-				majorBlobFeather: 12,
+				blur: 14,
+				sizeMultiplier: 4,
+				verticalStretch: 1.6,
+				majorBlobCount: 8,
+				majorBlobOpacity: 0.68,
+				majorBlobRadius: 28,
+				majorBlobFeather: 32,
 				jitter: 4,
 				edgeBleed: 2,
 				horizontalStretch: 1,
-				sideBloomCount: 2,
-				sideBloomOpacity: 0.38,
-				sideBloomRadius: 2,
+				sideBloomCount: 1,
+				sideBloomOpacity: 0.3,
+				sideBloomRadius: 18,
 			})
 
 			const controller = new AbortController()

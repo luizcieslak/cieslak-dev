@@ -136,14 +136,55 @@ const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Ambient glow sandbox prev
 			const controller = new AbortController()
 			const { signal } = controller
 
+			const FADE_OVERRIDE_MS = 60
+			let userFadeMs = ADVANCED_SLIDERS.find(s => s.key === 'fadeMs')?.default ?? 1000
+
+			let pendingPatch: Partial<GlowOptions> = {}
+			const pendingDisplays = new Map<HTMLElement, string>()
+			let pendingFrame: number | null = null
+
+			const flush = () => {
+				pendingFrame = null
+				pendingDisplays.forEach((text, el) => {
+					el.textContent = text
+				})
+				pendingDisplays.clear()
+				if (Object.keys(pendingPatch).length > 0) {
+					glow.setOptions(pendingPatch)
+					pendingPatch = {}
+				}
+			}
+
+			const schedule = () => {
+				if (pendingFrame !== null) return
+				pendingFrame = requestAnimationFrame(flush)
+			}
+
 			root.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(input => {
-				const output = input.parentElement?.querySelector('output')
+				const output = input.parentElement?.querySelector('output') as HTMLElement | null
+				const key = input.dataset.key as ControlKey
 				input.addEventListener(
 					'input',
 					() => {
 						const value = parseFloat(input.value)
-						if (output) output.textContent = Number.isInteger(value) ? `${value}` : value.toFixed(2)
-						glow.setOptions({ [input.dataset.key as ControlKey]: value })
+						if (output) pendingDisplays.set(output, Number.isInteger(value) ? `${value}` : value.toFixed(2))
+						const patch = pendingPatch as Record<string, number | boolean>
+						patch[key] = value
+						if (key === 'fadeMs') {
+							userFadeMs = value
+						} else {
+							patch.fadeMs = FADE_OVERRIDE_MS
+						}
+						schedule()
+					},
+					{ signal },
+				)
+				input.addEventListener(
+					'change',
+					() => {
+						if (key === 'fadeMs') return
+						;(pendingPatch as Record<string, number | boolean>).fadeMs = userFadeMs
+						schedule()
 					},
 					{ signal },
 				)
@@ -153,7 +194,8 @@ const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Ambient glow sandbox prev
 				input.addEventListener(
 					'change',
 					() => {
-						glow.setOptions({ [input.dataset.key as ControlKey]: input.checked })
+						;(pendingPatch as Record<string, number | boolean>)[input.dataset.key as ControlKey] = input.checked
+						schedule()
 					},
 					{ signal },
 				)
@@ -185,6 +227,7 @@ const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Ambient glow sandbox prev
 
 			cleanups.push(() => {
 				controller.abort()
+				if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
 				glow.destroy()
 				if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl)
 			})

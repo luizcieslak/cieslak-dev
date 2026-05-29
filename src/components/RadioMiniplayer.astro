@@ -152,19 +152,17 @@ const labels = {
 		const iconPause = document.getElementById('radio-miniplayer-icon-pause')!
 
 		mount(coverEl, {
-			blur: 8,
-			sizeMultiplier: 3.6,
-			majorBlobCount: 4,
-			majorBlobOpacity: 0.6,
-			majorBlobRadius: 32,
-			majorBlobFeather: 70,
-			jitter: 14,
-			edgeBleed: 24,
-			horizontalStretch: 1.4,
-			verticalStretch: 1.05,
-			sideBloomCount: 1,
-			sideBloomOpacity: 0.28,
-			sideBloomRadius: 40,
+			blur: 6,
+			sizeMultiplier: 2.4,
+			majorBlobCount: 2,
+			majorBlobOpacity: 0.48,
+			majorBlobRadius: 28,
+			majorBlobFeather: 64,
+			jitter: 10,
+			edgeBleed: 12,
+			horizontalStretch: 1.2,
+			verticalStretch: 1,
+			sideBloomCount: 0,
 		})
 
 		toggleBtn.addEventListener('click', e => {
