@@ -1,67 +1,64 @@
 ---
-title: Building a LoFi radio
-excerpt: After listening to LoFi for quite some time, I decided to build my own overengineered radio station.
+title: Contruindo uma rádio LoFi
+excerpt: Depois de ouvir muito LoFi por aí, decidi criar minha própria rádio.
 publishDate: '2026-05-08'
 seo:
   image:
     src: '/lofi'
-    alt: The classic "LoFi Girl" image but with a reinterpretation of it if she lived in Brazil.
+    alt: A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.
 ---
 import RadioCallout from '../../../components/RadioCallout.astro'
 import AmbientGlowSandbox from '../../../components/AmbientGlowSandbox.astro'
 import AmbientPaletteSandbox from '../../../components/AmbientPaletteSandbox.astro'
 
 
-![The classic "LoFi Girl" image but with a reinterpretation of its art imagining if she lived in Brazil.](/lofi/lofi.png)
+![A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.](/lofi/lofi.png)
 
-I like LoFi music.
+Eu curto ouvir um LoFi. Você já provavelmente viu esse vídeo da [rádio](https://www.youtube.com/watch?v=jfKfPfyJRdk) "LoFi Girl", que tem uma menina estudando em um ambiente com músicas chamadas de "LoFi" que ajudam a se concentrar. Essa é uma live no YouTube que existe desde 2018 desde então [quase nunca](https://www.theverge.com/2020/2/24/21150488/chilledcow-lofi-hiphop-livestream-youtube-termiantion-vod-anime-study-girl) parou de tocar. A live ainda é bem popular, com pessoas interagindo constantemente no chat e pegando em média 20 mil visualizações simultâneas todos os dias.
 
-You probably have seen or listened to the classic "LoFi Girl" [radio](https://www.youtube.com/watch?v=jfKfPfyJRdk) in the past. It is still very much a big hit: if you open that link now you should see at least 10k viewers in that stream, with people interacting in the chat constantly. 
+Eu comecei a ouvir _lofi_ como algo que eu colocava de fundo na hora de estudar na universidade. Depois de me formar, também ouvia as mesmas músicas enquanto trabalhava ou precisa focar em algo. Depois de um tempo, percebi que estava ouvindo essas músicas em outras ocasiões também e colocando elas nas minhas playlists pessoais. Foi aí que eu percebi que eu gostava de uma quantidade dessas músicas e que poderia fazer uma playlist com elas.
 
-The stream exists _almost_ interruptly since 2018 https://www.theverge.com/2020/2/24/21150488/chilledcow-lofi-hiphop-livestream-youtube-termiantion-vod-anime-study-girl
+Nesse ponto, realmente fazer _só_ uma playlist seria mais que suficiente. Porém, como um engenheiro de software que brisa um pouco demais as vezes, pensei em construir uma **rádio inteira a partir de zero**. 
 
-For me, "lofi" music started as something I would put as a background music when studying at college. After graduated, I began also listening it when working. Finally, I realized I was listening to them in another ocasions as well: I started to add it in my personal playlist, then I noticed: well, I might have listened so much to it that I might have a good collection of my favourite ones and therefore I decided to share it in the wild.
+Este é um post sobre o processo de construção da rádio que aprofunda em vários conceitos de matemática e programação. Todo o código que você vê aqui é _open-source_, e portanto aberto para que qualquer pessoa possa construir sua própria versão se quiser.
 
-I started listening to the genre more or less when the graduating from college which helped me focus and study. Then, I became to also listen to it when working. After some years, I noticed I was also listening to it in another ocasions too, adding it to playlists here and there and then I realized that I might have some good collection of tracks and therefore could have my own playlist to share to the world.
-
-At that point creating the playlist would be enough but as an engineer that _sometimes_ overengineer things, I decided to build a **whole radio station from scratch**. This is a blog post that goes over the whole process in depth. All the code you see here is open-source so you can create your own version if you'd like.
-
-To continue reading to this article, I invite you to turn it on below so we can hear the music together.
+Antes de começar a ler esse artigo, eu lhe convido a escutar a rádio abaixo, assim podemos ouvir a música juntos.
 
 <RadioCallout />
 
 
-# How a (lofi) radio could work
+# Como uma rádio (lofi) pode funcionar
 
 <picture>
 	<source media="(min-width: 768px)" srcset="/lofi/diagram-h.png" />
 	<img src="/lofi/diagram-v.png" alt="Diagram of how the radio is working" />
 </picture>
 
-This below is the diagram of how it is working right now. All the code used here is open source on this repositories
+O diagrama acima representa como a rádio que vc escuta está funcionando nesse momento. Todo o código usado está disponível nesses repositórios:
 
-* [this blog here or lofi.md]() The client side consuming the audio stream and interacting with the server via HTTP requests and SSE.
-* [lofi-radio]() Server aplication using Bun. Store the files, streams the audio and holds the Admin UI.
-* [shelf]() Playist management and replication in music apps like Spotify and YouTube Music.
-
-We will deep dive in each of these parts in the following sections.
-
+* [player]() A parte do _client_ que consome a _stream_ de aúdio e APIs via HTTP e SSE _(Server sent events)_
+* [lofi-radio]() Aplicação do servidor usando Bun. Armazena os arquivos físicos, cria a _stream_ de áudio e a interface de admin.
+* [shelf]() Gerenciamento de playlist local e sincronização com aplicativos de música tipo Spotify and YouTube Music.
 
 # Client side
 
-The client side consumes 2 APIS
+A parte do _client_ consome 2 APIs principais. 
 
-* Audio stream via HTTP request that return a stream of bytes.
+* Audio _stream_ via requisição HTTP que retorna uma _stream de bytes_.
+* Metadados sobre as músicas via _Server Sent Events (SSE)._ Envia eventos para o _client_ com informações sobre a música que está tocando no momento
 * Metadata information about the track via Server Sent Events (SSE). It pings the client with the information about the current track being played.
 
-If you played the radio in the callout above, you are already seeing the metadata in the player either in the right side of the screen or on the bottom if you are on mobile.
+Se vc colocou a rádio pra tocar ali em cima, vc já está vendo os metadados no tocador, ou do lado direito do site se está no _desktop_ ou uma faixa em baixo se está no celular.
 
-The [audio](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/audio) tag itself is straightforward from this point, but we also have custom logic built on top of it to handle server reconnections.
 
-Finally, we also have custom logic to prevent the screen to lock for mobile browsers and push metadata using [MediaSession API](https://developer.mozilla.org/en-US/docs/Web/API/MediaSession) to devices, so the information is visible in radio cars or lock screen in mobiles for example.
+
+A tag [audio](https://developer.mozilla.org/pt-BR/docs/Web/HTML/Reference/Elements/audio) é bem simples nesse momento, mas tem uma lógica em volta dele para lidar com algumas questões tipo reconexões com o servidor.
+
+Por fim, também possui mecanismos para a tela não apagar em celulares e também usa a [MediaSession API](https://developer.mozilla.org/pt-BR/docs/Web/API/MediaSession) para transmitir as informações para os dispositivos, assim conseguimos ver o nome da música e artista no rádio do carro ou na tela do celular quando na tela de desbloqueio.
+
 ## Album cover and blur gradient
 
-I believe artist put great thought into the album cover of their releases. I believe the intention is to see it alongside the playing track. some of them are pretty dope as well.
+I believe artist but great thought into the album cover of their releases. I believe the intention is to see it alongside the playing track. some of them are pretty dope as well.
 
 Thinking about that, **the most important element on the radio page is the album cover**. It is the biggest element and around it I've built a custom blur gradient effect from the colors that are extracted from the image.
 
