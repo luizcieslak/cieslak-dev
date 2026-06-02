@@ -131,29 +131,18 @@ Nessa versão atual da rádio, apenas o arquivo MP3 é suportado. O suporte de o
 
 # Shelf para gerenciamento de playlists.
 
-As músicas que vc ouve aqui também estão disponíveis no Spotify e YouTube Music. Nessa parte explico rápidamente como a gente pode usar uma ferramenta como essa que consegue sincronizar a mesma playlist não só entre essas plataformas mas também pode exportar a definição da playlist em um arquivo local, o qual usamos no servidor.
+As músicas que vc ouve aqui também estão disponíveis no Spotify e YouTube Music.
 
-Eu usei a API do Spotify para procurar, adicionar e organizar as músicas na playlist originalmente porque é o aplicativo que mais uso no momento. Depois, conectamos a conta no Shelf:
+Para evitar muito trabalho manual, eu construí uma ferramenta chamada [Shelf](https://github.com/luizcieslak/shelf) que consegue sincronizar a mesma playlist em diferentes plataformas:
 
-image1
+<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf1.mp4" />
 
-É possivel exportar a playlist em um arquivo JSON e também sincronizar automaticamente quando se adiciona uma nova música entre as plataformas:
+É possivel também exportar a playlist em um arquivo JSON na ordem, o que é utilizado no servidor local: 
 
-image2
+<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf2.mp4" />
 
-## How to sync the playlists between local, Spotify and YouTube Music
+O dahora do Shelf é que, após sincronizar todas as plataformas, a gestão da playlist pode ser feita totalmente por lá. Por exemplo, uma nova música adicionada na playlist vai ser adicionada em todas as plataformas ao mesmo tempo;
 
-shelf to sync
+<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf3.mp4" />
 
-
-
-
-admin page in server
-shelf? maybe
-
-lofi is cool
-
-
-# how the radio is built
-
-with code and lots of love
+# Próximos passos
