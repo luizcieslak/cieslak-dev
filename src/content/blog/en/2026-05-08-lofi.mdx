@@ -89,8 +89,8 @@ Here's the same algorithm running on a 4×4 grid so you can see the palette it p
 
 What is crazy for me is that the exact same algorithm that can be used to pixelize an image if you go long enough increasing the grid size. 
 
-{/* <add gif here> */}
- 
+<video class='w-full' autoplay muted loop playsinline src="/lofi/pixels3.mp4" />
+
 Nowadays with Ultra HD 8k screens it is easy to forget the image we see in front of us in a computer is a grid of pixels, but we are actually seeing billions of them at every single frame.
 
 # Server side
@@ -105,6 +105,9 @@ playlist state
 Not exactly every 26ms, but that number is coming from how we parse the MP3 frames.
 
 So, a little back in history: The MP3 format itself is widely used to store and transport audio files. It is very efficient to compress an audio file size while maintaing the quality.
+
+![Um tocador MP3 antigo que revolucionou o conceito de musica portátil](/lofi/mp3-stick.webp)
+(the ones that had one of these know what I am talking about.)
 
 Inside the MP3 format, there are several ways of compressing the data. the most used of them, MPEG-1 Layer 3, is a lossy compression that is very efficient in terms of compression ratio.
 
@@ -130,6 +133,7 @@ stream and sse events
 
 In this current version of the radio, it only supports MP3 files. In order to support more extensions, the same algorithm to determine the frame duration would need to be replicated to them so the frames constant cadence is maintainted in the stream level.
 
+The addition of files is done using the Admin APIs that can manage the playlist by adding, editing metadata or removing songs in the playlist.
 
 # Shelf for Playlist management
 

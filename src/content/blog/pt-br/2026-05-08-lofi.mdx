@@ -86,7 +86,7 @@ Exemplo do algoritmo rodando em uma grade 4x4 para que na prática vemos quais s
 
 O que é muito louco pra mim é que esse algoritmo pode ser usado para "pixelar" uma imagem se vc for longe aumentando o tamanho da grade:
 
-{/* <add gif here> */}
+<video class='w-full' autoplay muted loop playsinline src="/lofi/pixels3.mp4" />
 
 Hoje em dia com monitores super tecnológicos rodando até em resoluções Ultra HD 8k é dificil de lembrar que o que está na nossa frente é de fato uma grade de pixels, muitos pixels, na verdade bilhões de pixels que passam na tela a cada segundo.
 
@@ -103,6 +103,7 @@ Não exatamente a cada 26 milissegundos, mas esse número vem de como lemos os _
 
 Voltando um pouco na história da internet: Os arquivos MP3 quando lançado revolucionou o jeito em que lidávamos com audio com uma eficiente compressão de tamanho enquanto mantém uma ótima qualidade de som.
 
+![Um tocador MP3 antigo que revolucionou o conceito de musica portátil](/lofi/mp3-stick.webp)
 (quem tinha um desses aparelhos sabe o que eu estou falando)
 
 Dentro do formato MP3, há varios tipos de compressão de dados. A mais utilizada se chama _MPEG-1 Layer 3_, que é justamente a compressão que perde um pouco da qualidade da música mas que é tem um tamanho bem enxuto.
@@ -125,11 +126,13 @@ maybe a visualizer on each frame, dunno
 stream and sse events
 
 
-# arquivos
+# Arquivos
 
 Nessa versão atual da rádio, apenas o arquivo MP3 é suportado. O suporte de outras extensões e formatos requerem que a mesmo algoritmo que determina a duração de um _frame_ seja replicada para eles, para que a cadência de frames transmitidos na _stream_ seja constante.
 
-# Shelf para gerenciamento de playlists.
+A adição de arquivos é feita usando as APIs de Admin que conseguem gerenciar a playlist adicionando, editando metadados ou removendo músicas da playlist.
+
+# Shelf para gerenciamento da playlist
 
 As músicas que vc ouve aqui também estão disponíveis no Spotify e YouTube Music.
 
