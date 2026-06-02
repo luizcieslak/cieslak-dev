@@ -1,0 +1,311 @@
+---
+type Lang = 'en' | 'pt-br'
+
+interface Props {
+	lang?: Lang
+}
+
+const { lang = 'en' } = Astro.props
+
+const strings = {
+	en: {
+		frameLabel: 'frame',
+		lanes: [
+			{ kind: 'reference', label: '26 ms grid', sub: 'perfect clock' },
+			{ kind: 'setTimeout', label: 'setTimeout', sub: 'best-effort' },
+			{ kind: 'precise', label: 'PreciseTimer', sub: 'clock-corrected' },
+		],
+	},
+	'pt-br': {
+		frameLabel: 'frame',
+		lanes: [
+			{ kind: 'reference', label: 'grade de 26 ms', sub: 'relógio perfeito' },
+			{ kind: 'setTimeout', label: 'setTimeout', sub: 'sem garantia' },
+			{ kind: 'precise', label: 'PreciseTimer', sub: 'corrigido pelo relógio' },
+		],
+	},
+}[lang]
+---
+
+<figure
+	class='precise-timer-demo not-prose my-10 rounded-lg border border-main/20 bg-muted/30 p-4 sm:p-6'
+	data-frame-label={strings.frameLabel}
+>
+	<figcaption class='mb-5 text-sm leading-relaxed opacity-80'>
+		{
+			lang === 'en' ? (
+				<>
+					Every <span class='font-mono'>26&nbsp;ms</span> the server must hand out one MP3 frame. A naive{' '}
+					<span class='font-mono'>setTimeout</span> loop drifts off the grid; the clock-correcting{' '}
+					<span class='font-mono'>PreciseTimer</span> stays locked to it.
+				</>
+			) : (
+				<>
+					A cada <span class='font-mono'>26&nbsp;ms</span> o servidor precisa entregar um frame de MP3. Um loop
+					ingênuo com <span class='font-mono'>setTimeout</span> vai escorregando para fora da grade; o{' '}
+					<span class='font-mono'>PreciseTimer</span>, que se corrige pelo relógio, permanece travado nela.
+				</>
+			)
+		}
+	</figcaption>
+
+	<div class='precise-timer-lanes grid items-center gap-x-3 gap-y-2.5' style='grid-template-columns: max-content 1fr;'>
+		{
+			strings.lanes.map(lane => (
+				<Fragment>
+					<div class='text-right leading-tight'>
+						<div class='font-mono text-xs sm:text-sm'>{lane.label}</div>
+						<div class='text-[10px] uppercase tracking-wide opacity-50'>{lane.sub}</div>
+					</div>
+					<div
+						class='precise-timer-track relative h-9 overflow-hidden rounded-md bg-black/[0.03] ring-1 ring-inset ring-black/5 dark:bg-white/[0.04] dark:ring-white/10 sm:h-10'
+						data-lane={lane.kind}
+					/>
+				</Fragment>
+			))
+		}
+	</div>
+
+	<p class='precise-timer-readout mt-4 font-mono text-xs tabular-nums sm:text-sm'></p>
+
+	<p class='mt-3 text-xs leading-relaxed opacity-60'>
+		{
+			lang === 'en' ? (
+				<>
+					Slowed down and the wobble exaggerated so you can see it. A few milliseconds per frame sound harmless —
+					but a 3-minute track is roughly 7,000 frames, so the slip compounds into seconds of desync. That's why
+					the stream re-checks the clock on <em>every</em> frame instead of trusting{' '}
+					<span class='font-mono'>setTimeout</span>.
+				</>
+			) : (
+				<>
+					Bem mais devagar e com o tremor exagerado para dar pra ver. Alguns milissegundos por frame parecem
+					inofensivos — mas uma música de 3 minutos tem cerca de 7.000 frames, então o atraso se acumula em
+					segundos de dessincronização. É por isso que a stream confere o relógio a <em>cada</em> frame em vez de
+					confiar no <span class='font-mono'>setTimeout</span>.
+				</>
+			)
+		}
+	</p>
+</figure>
+
+<style is:global>
+	@keyframes ptd-pop {
+		from {
+			opacity: 0;
+			transform: translate(-50%, -50%) scale(0.2);
+		}
+		to {
+			opacity: 1;
+			transform: translate(-50%, -50%) scale(1);
+		}
+	}
+	@keyframes ptd-fade {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+</style>
+
+<script>
+	const N = 12 // frames emitted per cycle
+	const PAD = 7 // % left padding before the first grid line
+	const SPAN = 64 // % width the grid occupies (leaves headroom for drift)
+	const GAP = SPAN / (N - 1)
+	const STEP_MS = 250 // visual tempo between emissions (the real value is 26ms)
+	const HOLD_MS = 1400 // pause on a full lane before looping
+	const DRIFT_CAP = 2.1 // max setTimeout drift, in grid cells, for layout safety
+
+	type LaneKind = 'reference' | 'setTimeout' | 'precise'
+
+	// Cumulative setTimeout drift per frame, in grid cells. Monotonic, jittery,
+	// always late — the shape a naive setTimeout chain actually produces.
+	function makeDrift(): number[] {
+		const cum: number[] = []
+		let s = 0
+		for (let i = 0; i < N; i++) {
+			let e = 0.16 + (Math.random() - 0.35) * 0.16
+			if (Math.random() < 0.15) e *= 0.2 // occasional near-on-time frame
+			s += Math.max(0.01, e)
+			cum.push(s)
+		}
+		const max = cum[N - 1]
+		if (max > DRIFT_CAP) {
+			const f = DRIFT_CAP / max
+			return cum.map(c => c * f)
+		}
+		return cum
+	}
+
+	function addGuides(track: HTMLElement, strong: boolean) {
+		const tone = strong ? 'bg-black/20 dark:bg-white/20' : 'bg-black/10 dark:bg-white/10'
+		for (let i = 0; i < N; i++) {
+			const g = document.createElement('div')
+			g.className = `absolute top-1.5 bottom-1.5 w-px ${tone}`
+			g.style.left = `${PAD + i * GAP}%`
+			track.appendChild(g)
+		}
+	}
+
+	function makeLayer(track: HTMLElement): HTMLElement {
+		const layer = document.createElement('div')
+		layer.className = 'absolute inset-0'
+		track.appendChild(layer)
+		return layer
+	}
+
+	function addDot(layer: HTMLElement, xPct: number, kind: LaneKind, animate: boolean) {
+		const color =
+			kind === 'precise'
+				? 'bg-emerald-500 ring-2 ring-emerald-500/25'
+				: kind === 'setTimeout'
+					? 'bg-amber-500'
+					: 'bg-black/55 dark:bg-white/70'
+		const d = document.createElement('div')
+		d.className = `absolute top-1/2 h-2.5 w-2.5 rounded-full ${color}`
+		d.style.left = `${xPct}%`
+		d.style.transform = 'translate(-50%, -50%)'
+		if (animate) d.style.animation = 'ptd-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both'
+		layer.appendChild(d)
+	}
+
+	function addConnector(layer: HTMLElement, xPct: number, widthPct: number, animate: boolean) {
+		if (widthPct < 0.3) return
+		const c = document.createElement('div')
+		c.className = 'absolute top-1/2 h-0.5 rounded-full bg-amber-500/50'
+		c.style.left = `${xPct}%`
+		c.style.width = `${widthPct}%`
+		c.style.transform = 'translateY(-50%)'
+		if (animate) c.style.animation = 'ptd-fade 300ms ease both'
+		layer.appendChild(c)
+	}
+
+	function initDemo(root: HTMLElement): () => void {
+		const frameLabel = root.dataset.frameLabel ?? 'frame'
+		const readout = root.querySelector<HTMLElement>('.precise-timer-readout')!
+		const tracks: Record<LaneKind, HTMLElement> = {
+			reference: root.querySelector<HTMLElement>('[data-lane="reference"]')!,
+			setTimeout: root.querySelector<HTMLElement>('[data-lane="setTimeout"]')!,
+			precise: root.querySelector<HTMLElement>('[data-lane="precise"]')!,
+		}
+
+		addGuides(tracks.reference, true)
+		addGuides(tracks.setTimeout, false)
+		addGuides(tracks.precise, false)
+
+		const layers: Record<LaneKind, HTMLElement> = {
+			reference: makeLayer(tracks.reference),
+			setTimeout: makeLayer(tracks.setTimeout),
+			precise: makeLayer(tracks.precise),
+		}
+
+		let drift = makeDrift()
+
+		function emit(k: number, animate: boolean) {
+			const x = PAD + k * GAP
+			addDot(layers.reference, x, 'reference', animate)
+			addDot(layers.precise, x, 'precise', animate)
+			const dx = drift[k] * GAP
+			addConnector(layers.setTimeout, x, dx, animate)
+			addDot(layers.setTimeout, x + dx, 'setTimeout', animate)
+		}
+
+		function render(k: number) {
+			const st = Math.round(drift[k] * 26)
+			const pr = (0.05 + k * 0.018).toFixed(1)
+			readout.innerHTML =
+				`<span class="opacity-60">${frameLabel} ${k + 1}/${N}</span>` +
+				`<span class="mx-1.5 opacity-30">·</span>` +
+				`<span class="font-semibold text-amber-600 dark:text-amber-400">setTimeout +${st} ms</span>` +
+				`<span class="mx-1.5 opacity-30">·</span>` +
+				`<span class="font-semibold text-emerald-600 dark:text-emerald-400">PreciseTimer +${pr} ms</span>`
+		}
+
+		// Reduced motion: render the final, drifted state once and stop.
+		if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+			for (let k = 0; k < N; k++) emit(k, false)
+			render(N - 1)
+			return () => {}
+		}
+
+		let emitted = -1
+		let cycleStart = 0
+		let holdUntil = 0
+		let phase: 'play' | 'hold' = 'play'
+		let raf = 0
+		let running = false
+
+		function reset(now: number) {
+			layers.reference.replaceChildren()
+			layers.setTimeout.replaceChildren()
+			layers.precise.replaceChildren()
+			drift = makeDrift()
+			emitted = -1
+			cycleStart = now
+			phase = 'play'
+		}
+
+		function loop(now: number) {
+			if (phase === 'play') {
+				const due = Math.min(N - 1, Math.floor((now - cycleStart) / STEP_MS))
+				while (emitted < due) {
+					emitted++
+					emit(emitted, true)
+				}
+				if (emitted >= 0) render(emitted)
+				if (emitted >= N - 1 && now - cycleStart > N * STEP_MS) {
+					phase = 'hold'
+					holdUntil = now + HOLD_MS
+				}
+			} else if (now >= holdUntil) {
+				reset(now)
+			}
+			raf = requestAnimationFrame(loop)
+		}
+
+		function start() {
+			if (running) return
+			running = true
+			reset(performance.now())
+			raf = requestAnimationFrame(loop)
+		}
+
+		function stop() {
+			running = false
+			cancelAnimationFrame(raf)
+		}
+
+		// Only animate while on screen — keeps it off the CPU when scrolled away.
+		const io = new IntersectionObserver(
+			entries => {
+				for (const e of entries) {
+					if (e.isIntersecting) start()
+					else stop()
+				}
+			},
+			{ threshold: 0.2 },
+		)
+		io.observe(root)
+
+		return () => {
+			stop()
+			io.disconnect()
+		}
+	}
+
+	document.addEventListener('astro:page-load', () => {
+		const roots = document.querySelectorAll<HTMLElement>('.precise-timer-demo')
+		if (roots.length === 0) return
+
+		const cleanups = Array.from(roots, initDemo)
+
+		document.addEventListener(
+			'astro:before-preparation',
+			() => cleanups.forEach(fn => fn()),
+			{ once: true },
+		)
+	})
+</script>
