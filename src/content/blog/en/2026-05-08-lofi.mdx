@@ -10,6 +10,9 @@ seo:
 import RadioCallout from '../../../components/RadioCallout.astro'
 import AmbientGlowSandbox from '../../../components/AmbientGlowSandbox.astro'
 import AmbientPaletteSandbox from '../../../components/AmbientPaletteSandbox.astro'
+import PreciseTimerDemo from '../../../components/PreciseTimerDemo.astro'
+import FrameDurationDemo from '../../../components/FrameDurationDemo.astro'
+import FanOutDemo from '../../../components/FanOutDemo.astro'
 
 
 ![The classic "LoFi Girl" image but with a reinterpretation of its art imagining if she lived in Brazil.](/lofi/lofi.png)
@@ -109,18 +112,24 @@ So, a little back in history: The MP3 format itself is widely used to store and 
 ![Um tocador MP3 antigo que revolucionou o conceito de musica portátil](/lofi/mp3-stick.webp)
 (the ones that had one of these know what I am talking about.)
 
-Inside the MP3 format, there are several ways of compressing the data. the most used of them, MPEG-1 Layer 3, is a lossy compression that is very efficient in terms of compression ratio.
+Inside the MP3 format, there are several ways of compressing the data. the most used of them, MPEG-1 Layer 3, is a lossy compression that is very efficient in terms of compression ratio. This compression format states **each frame of an audio stores exactly 1152 samples**.
 
 (need to also explain about the 44.1kHz sampling rate)
 
 For each frame of an audio, it stores exactly 1152 audio samples. Therefore, if the track has 44.1kHz sampling rate, and MPEG-1 Layer 3 holds 1152 samples, each frame duration is ~26ms (need fuurther explanation about the frame duration, still confusing af).
 
+<FrameDurationDemo lang="en" />
+
 explain how a stream server works. like someone giving cards into a table. every player should have the same amount of cards at the same time. a radio transmission works like that, where you need to tune into a station and then receive the broadcast from it.
+
+<FanOutDemo lang="en" />
 
 explain we need to respect that number in streaming. why setTimeout() can't be used. 
 need the PreciseTimer to be able to respond in the sub-millisecond range.
 
 setTimeout works in a best-effort way when it comes to precise milliseconds. It can't guarantee something will way to be executed in exact 26ms. It can be 26, 24, 32ms, depending how soon the CPU can handle that process. We gotta remind ourselves that server aplications are CPU-bound and therefore share the Operational System resources like any other process running alongside it.
+
+<PreciseTimerDemo lang="en" />
 
 
 

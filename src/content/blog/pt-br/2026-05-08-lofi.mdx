@@ -10,6 +10,9 @@ seo:
 import RadioCallout from '../../../components/RadioCallout.astro'
 import AmbientGlowSandbox from '../../../components/AmbientGlowSandbox.astro'
 import AmbientPaletteSandbox from '../../../components/AmbientPaletteSandbox.astro'
+import PreciseTimerDemo from '../../../components/PreciseTimerDemo.astro'
+import FrameDurationDemo from '../../../components/FrameDurationDemo.astro'
+import FanOutDemo from '../../../components/FanOutDemo.astro'
 
 
 ![A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.](/lofi/lofi.png)
@@ -112,12 +115,18 @@ Dentro do formato MP3, há varios tipos de compressão de dados. A mais utilizad
 
 Para cada _frame_ de um áudio, ele armazena exatamente 1152 "pedaços" de áudio. POrtanto, se a música tem um _sampling rate_ de 44.1 kHz, cada frame precisa ter uma duração de 26ms (calc).
 
+<FrameDurationDemo lang="pt-br" />
+
 explain how a stream server works. like someone giving cards into a table. every player should have the same amount of cards at the same time. a radio transmission works like that, where you need to tune into a station and then receive the broadcast from it.
+
+<FanOutDemo lang="pt-br" />
 
 explain we need to respect that number in streaming. why setTimeout() can't be used. 
 need the PreciseTimer to be able to respond in the sub-millisecond range.
 
 setTimeout works in a best-effort way when it comes to precise milliseconds. It can't guarantee something will way to be executed in exact 26ms. It can be 26, 24, 32ms, depending how soon the CPU can handle that process. We gotta remind ourselves that server aplications are CPU-bound and therefore share the Operational System resources like any other process running alongside it.
+
+<PreciseTimerDemo lang="pt-br" />
 
 
 
