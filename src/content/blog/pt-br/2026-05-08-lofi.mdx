@@ -116,9 +116,13 @@ Dentro do formato MP3, há varios tipos de compressão de dados. A mais utilizad
 
 Para cada _frame_ de um áudio, ele armazena exatamente 1152 "pedaços" de áudio. POrtanto, se a música tem um _sampling rate_ de 44.1 kHz, cada frame precisa ter uma duração de 26ms (calc).
 
+Cada frame de MPEG-1 Layer III carrega exatamente 1152 amostras de áudio. Divida pela taxa de amostragem e você tem quanto dura um único frame — a cadência que o servidor precisa manter.
+
 <FrameDurationDemo lang="pt-br" />
 
 explain how a stream server works. like someone giving cards into a table. every player should have the same amount of cards at the same time. a radio transmission works like that, where you need to tune into a station and then receive the broadcast from it.
+
+Um frame sai a cada `26 ms` para _todos_ os ouvintes ao mesmo tempo. Se você chega atrasado, a música não recomeça — você entra exatamente onde ela está agora, igual a um rádio.
 
 <FanOutDemo lang="pt-br" />
 
@@ -127,11 +131,15 @@ need the PreciseTimer to be able to respond in the sub-millisecond range.
 
 setTimeout works in a best-effort way when it comes to precise milliseconds. It can't guarantee something will way to be executed in exact 26ms. It can be 26, 24, 32ms, depending how soon the CPU can handle that process. We gotta remind ourselves that server aplications are CPU-bound and therefore share the Operational System resources like any other process running alongside it.
 
+A cada `26 ms` o servidor precisa entregar um frame de MP3. Um loop ingênuo com `setTimeout` vai escorregando para fora da grade; o `PreciseTimer`, que se corrige pelo relógio, permanece travado nela.
+
 <PreciseTimerDemo lang="pt-br" />
 
 buffer explanation
 
-<BufferCushionDemo lang="en" />
+Uma stream em tempo real entrega o áudio rápido o suficiente para tocá-lo — _nunca_ mais rápido. A mesma rede instável alimenta os dois medidores; a única diferença é quanto há no buffer à frente. Com quase nada no buffer, cada engasgo o esvazia e você ouve uma falha. Alguns segundos de folga — o que o `burst-on-connect` instala no momento em que você conecta — absorvem os mesmos engasgos.
+
+<BufferCushionDemo lang="pt-br" />
 
 
 

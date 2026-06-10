@@ -40,23 +40,6 @@ const rows = [
 	data-frame-tpl={strings.frameTpl}
 	data-frames='240'
 >
-	<figcaption class='mb-4 text-sm leading-relaxed opacity-80'>
-		{
-			lang === 'en' ? (
-				<>
-					One frame goes out every <span class='font-mono'>26&nbsp;ms</span> to <em>every</em> listener at once.
-					Tune in late and the song doesn't restart — you join right where it is now, exactly like a radio.
-				</>
-			) : (
-				<>
-					Um frame sai a cada <span class='font-mono'>26&nbsp;ms</span> para <em>todos</em> os ouvintes ao mesmo
-					tempo. Se você chega atrasado, a música não recomeça — você entra exatamente onde ela está agora, igual a
-					um rádio.
-				</>
-			)
-		}
-	</figcaption>
-
 	<div class='fanout-stage grid items-center gap-x-3 gap-y-2' style='grid-template-columns: max-content 1fr;'>
 		{
 			rows.map(row => (
