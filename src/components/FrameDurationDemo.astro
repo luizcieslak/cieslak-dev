@@ -59,7 +59,8 @@ const strings = {
 
 	<div class='mt-4'>
 		<input
-			class='frame-duration-slider w-full max-w-xs'
+			class='frame-duration-slider demo-slider w-full'
+			style={`--demo-slider-pct: ${(DEFAULT_IDX / (RATES.length - 1)) * 100}%`}
 			type='range'
 			min='0'
 			max='2'
@@ -67,7 +68,7 @@ const strings = {
 			value={DEFAULT_IDX}
 			aria-label='sample rate'
 		/>
-		<div class='mt-1 flex max-w-xs justify-between text-xs'>
+		<div class='mt-1 flex justify-between text-xs'>
 			{
 				RATE_LABELS.map((label, i) => (
 					<span class='frame-duration-tick tabular-nums opacity-50' data-idx={i}>

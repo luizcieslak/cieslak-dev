@@ -65,6 +65,67 @@
 }
 
 @layer components {
+	/* Custom range sliders used in the lofi blog demos.
+	   Uses currentColor so it stays "white" in dark mode and dark in the light theme.
+	   Firefox fills via ::-moz-range-progress; WebKit fills via the
+	   --demo-slider-pct gradient kept in sync by a script in BaseLayout. */
+	.demo-slider {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 100%;
+		height: 1.25rem;
+		background: transparent;
+		cursor: pointer;
+	}
+	.demo-slider::-webkit-slider-runnable-track {
+		height: 5px;
+		border-radius: 9999px;
+		background: linear-gradient(
+			to right,
+			currentColor 0 var(--demo-slider-pct, 50%),
+			color-mix(in srgb, currentColor 18%, transparent) var(--demo-slider-pct, 50%) 100%
+		);
+	}
+	.demo-slider::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		height: 14px;
+		width: 14px;
+		margin-top: -4.5px;
+		border-radius: 9999px;
+		background: currentColor;
+		box-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+	}
+	.demo-slider::-moz-range-track {
+		height: 5px;
+		border-radius: 9999px;
+		background: color-mix(in srgb, currentColor 18%, transparent);
+	}
+	.demo-slider::-moz-range-progress {
+		height: 5px;
+		border-radius: 9999px;
+		background: currentColor;
+	}
+	.demo-slider::-moz-range-thumb {
+		height: 14px;
+		width: 14px;
+		border: none;
+		border-radius: 9999px;
+		background: currentColor;
+		box-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+	}
+	.demo-slider:focus-visible {
+		outline: none;
+	}
+	.demo-slider:focus-visible::-webkit-slider-thumb {
+		outline: 2px solid currentColor;
+		outline-offset: 2px;
+	}
+	.demo-slider:focus-visible::-moz-range-thumb {
+		outline: 2px solid currentColor;
+		outline-offset: 2px;
+	}
+
 	.radio-nav-badge {
 		font-family: 'Space Mono', monospace;
 		font-size: 0.72em;

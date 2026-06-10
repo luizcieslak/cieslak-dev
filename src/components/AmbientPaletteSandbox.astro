@@ -21,23 +21,24 @@ const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Color palette extraction 
 	</div>
 
 	<div class='mt-5 grid gap-3 text-sm'>
-		<label class='flex items-center gap-3'>
-			<span class='w-32 shrink-0 opacity-80'>Grid size</span>
+		<label class='grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 sm:flex sm:items-center'>
+			<span class='opacity-80 sm:w-32 sm:shrink-0'>Grid size</span>
+			<output class='ambient-palette-sandbox-grid-size-out text-right tabular-nums opacity-70 sm:order-last sm:w-14'
+				>4×4</output
+			>
 			<input
-				class='ambient-palette-sandbox-grid-size flex-1'
+				class='ambient-palette-sandbox-grid-size demo-slider col-span-2 min-w-0 sm:col-span-1 sm:flex-1'
+				style='--demo-slider-pct: 3.45%'
 				type='range'
 				min='2'
 				max='60'
 				step='1'
 				value='4'
 			/>
-			<output class='ambient-palette-sandbox-grid-size-out w-14 text-right tabular-nums opacity-70'
-				>4×4</output
-			>
 		</label>
-		<label class='flex items-center gap-3'>
-			<span class='w-32 shrink-0 opacity-80'>Upload image</span>
-			<input class='ambient-palette-sandbox-upload flex-1' type='file' accept='image/*' />
+		<label class='grid gap-y-1.5 sm:flex sm:items-center sm:gap-3'>
+			<span class='opacity-80 sm:w-32 sm:shrink-0'>Upload image</span>
+			<input class='ambient-palette-sandbox-upload min-w-0 sm:flex-1' type='file' accept='image/*' />
 		</label>
 	</div>
 </figure>

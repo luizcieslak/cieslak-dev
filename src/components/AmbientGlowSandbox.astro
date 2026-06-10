@@ -20,9 +20,9 @@ const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Ambient glow sandbox prev
 	</div>
 
 	<div class='mt-5 grid gap-3 text-sm'>
-		<label class='flex items-center gap-3'>
-			<span class='w-32 shrink-0 opacity-80'>Upload image</span>
-			<input class='ambient-glow-sandbox-upload flex-1' type='file' accept='image/*' />
+		<label class='grid gap-y-1.5 sm:flex sm:items-center sm:gap-3'>
+			<span class='opacity-80 sm:w-32 sm:shrink-0'>Upload image</span>
+			<input class='ambient-glow-sandbox-upload min-w-0 sm:flex-1' type='file' accept='image/*' />
 		</label>
 
 		<!-- curated controls -->
@@ -95,11 +95,12 @@ const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Ambient glow sandbox prev
 
 	function buildSliderRow(spec: SliderSpec): HTMLElement {
 		const row = document.createElement('label')
-		row.className = 'flex items-center gap-3'
+		row.className = 'grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 sm:flex sm:items-center'
+		const pct = spec.max > spec.min ? ((spec.default - spec.min) / (spec.max - spec.min)) * 100 : 50
 		row.innerHTML = `
-			<span class="w-32 shrink-0 opacity-80">${spec.label}</span>
-			<input class="flex-1" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${spec.default}" data-key="${spec.key}" />
-			<output class="w-14 text-right tabular-nums opacity-70">${spec.default}</output>
+			<span class="opacity-80 sm:w-32 sm:shrink-0">${spec.label}</span>
+			<output class="text-right tabular-nums opacity-70 sm:order-last sm:w-14">${spec.default}</output>
+			<input class="demo-slider col-span-2 min-w-0 sm:col-span-1 sm:flex-1" style="--demo-slider-pct: ${pct}%" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${spec.default}" data-key="${spec.key}" />
 		`
 		return row
 	}
