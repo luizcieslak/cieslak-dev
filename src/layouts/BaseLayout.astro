@@ -39,5 +39,27 @@ const locale = Astro.currentLocale ?? 'en'
 			<Footer />
 		</div>
 		<RadioMiniplayer />
+		<script>
+			// Keep the WebKit "filled" portion of .demo-slider in sync (Firefox does this
+			// natively via ::-moz-range-progress). See .demo-slider in global.css.
+			function setDemoSliderPct(el: HTMLInputElement) {
+				const min = parseFloat(el.min) || 0
+				const max = parseFloat(el.max)
+				const range = (Number.isNaN(max) ? 100 : max) - min
+				const pct = range > 0 ? ((parseFloat(el.value) - min) / range) * 100 : 50
+				el.style.setProperty('--demo-slider-pct', `${pct}%`)
+			}
+			const w = window as unknown as { __demoSlidersBound?: boolean }
+			if (!w.__demoSlidersBound) {
+				w.__demoSlidersBound = true
+				document.addEventListener('input', e => {
+					const t = e.target
+					if (t instanceof HTMLInputElement && t.classList.contains('demo-slider')) setDemoSliderPct(t)
+				})
+			}
+			document.addEventListener('astro:page-load', () => {
+				document.querySelectorAll<HTMLInputElement>('input.demo-slider').forEach(setDemoSliderPct)
+			})
+		</script>
 	</body>
 </html>

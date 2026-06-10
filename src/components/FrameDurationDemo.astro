@@ -67,6 +67,7 @@ const strings = {
 			step='1'
 			value={DEFAULT_IDX}
 			aria-label='sample rate'
+			aria-valuetext={RATE_LABELS[DEFAULT_IDX]}
 		/>
 		<div class='mt-1 flex justify-between text-xs'>
 			{
@@ -87,6 +88,7 @@ const strings = {
 <script>
 	const SAMPLES = 1152
 	const RATES = [32000, 44100, 48000]
+	const RATE_LABELS = ['32 kHz', '44.1 kHz', '48 kHz']
 
 	function initDemo(root: HTMLElement): () => void {
 		const locale = root.dataset.locale ?? 'en-US'
@@ -107,6 +109,7 @@ const strings = {
 			const fps = 1000 / dur
 			const total = Math.round(fps * 180)
 
+			slider.setAttribute('aria-valuetext', RATE_LABELS[idx])
 			rateEl.textContent = nf.format(rate)
 			resultEl.textContent = nf1.format(dur)
 			derivedEl.textContent = derivedTpl.replace('{fps}', nf1.format(fps)).replace('{total}', nf.format(total))

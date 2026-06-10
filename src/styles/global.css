@@ -73,7 +73,7 @@
 		-webkit-appearance: none;
 		appearance: none;
 		width: 100%;
-		height: 1.25rem;
+		height: 1.5rem;
 		background: transparent;
 		cursor: pointer;
 	}
@@ -124,6 +124,30 @@
 	.demo-slider:focus-visible::-moz-range-thumb {
 		outline: 2px solid currentColor;
 		outline-offset: 2px;
+	}
+
+	@media (forced-colors: active) {
+		.demo-slider::-webkit-slider-runnable-track {
+			background: linear-gradient(
+				to right,
+				Highlight 0 var(--demo-slider-pct, 50%),
+				GrayText var(--demo-slider-pct, 50%) 100%
+			);
+		}
+		.demo-slider::-moz-range-track {
+			background: GrayText;
+		}
+		.demo-slider::-moz-range-progress {
+			background: Highlight;
+		}
+		.demo-slider::-webkit-slider-thumb,
+		.demo-slider::-moz-range-thumb {
+			background: CanvasText;
+		}
+		.demo-slider:focus-visible::-webkit-slider-thumb,
+		.demo-slider:focus-visible::-moz-range-thumb {
+			outline-color: CanvasText;
+		}
 	}
 
 	.radio-nav-badge {
