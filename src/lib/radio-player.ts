@@ -56,6 +56,13 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 	audio.volume = 0.7
 	audio.preload = 'none'
 
+	// Per-tab id so the server dedupes our reconnects and counts us as one listener.
+	let sessionId = sessionStorage.getItem('radio_session_id')
+	if (!sessionId) {
+		sessionId = crypto.randomUUID()
+		sessionStorage.setItem('radio_session_id', sessionId)
+	}
+
 	const emit = () => {
 		const snapshot = { ...internal.state }
 		internal.listeners.forEach(l => l(snapshot))
@@ -108,8 +115,12 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 			clearTimeout(internal.reconnectTimer)
 			internal.reconnectTimer = null
 		}
-		audio.src = internal.api + '/stream?t=' + Date.now()
-		audio.play().catch(() => scheduleReconnect())
+		console.warn(`[radio] connect() attempt=${internal.reconnectAttempt}`)
+		audio.src = internal.api + '/stream?sid=' + sessionId + '&t=' + Date.now()
+		audio.play().catch(err => {
+			console.warn('[radio] play() rejected', err && err.name, err && err.message)
+			scheduleReconnect()
+		})
 	}
 
 	const scheduleReconnect = () => {
@@ -148,7 +159,6 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 	}
 
 	audio.addEventListener('play', () => {
-		internal.reconnectAttempt = 0
 		internal.state = { ...internal.state, playing: true }
 		void requestWakeLock()
 		if ('mediaSession' in navigator) {
@@ -163,12 +173,58 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 			navigator.mediaSession.playbackState = 'paused'
 		}
 		emit()
+		// Don't reconnect here: `pause` fires on our own src swaps and OS pauses.
+		// Real underruns surface as `waiting`; the watchdog handles genuine stalls.
+	})
+
+	// Logs why each reconnect fired — esp. mediaError.code (code 3 = decode error at a
+	// track-boundary format change). Kept in prod for ongoing diagnosis.
+	const logReconnect = (trigger: string) => {
+		const e = audio.error
+		console.warn(
+			`[radio] reconnect via ${trigger}`,
+			`t=${audio.currentTime.toFixed(2)}`,
+			`readyState=${audio.readyState}`,
+			`networkState=${audio.networkState}`,
+			e ? `mediaError.code=${e.code} (${e.message || 'no msg'})` : 'mediaError=none',
+		)
+	}
+
+	// `ended`/`error` mean the connection dropped (or a track-boundary decode error,
+	// recoverable only by reopening), so reconnect. We deliberately ignore
+	// `stalled`/`waiting` — they're normal jitter on a shallow-buffer live stream.
+	audio.addEventListener('ended', () => {
+		logReconnect('ended')
+		if (internal.state.wantPlaying) scheduleReconnect()
+	})
+	audio.addEventListener('error', () => {
+		logReconnect('error')
 		if (internal.state.wantPlaying) scheduleReconnect()
 	})
 
-	audio.addEventListener('ended', () => scheduleReconnect())
-	audio.addEventListener('error', () => scheduleReconnect())
-	audio.addEventListener('stalled', () => scheduleReconnect())
+	// Silent-death watchdog: if currentTime stops advancing for ~6s while we want to
+	// play, the stream is dead with no event (mobile background / dropped TCP). Reconnect.
+	let lastTime = 0
+	let stalledTicks = 0
+	setInterval(() => {
+		if (!internal.state.wantPlaying || !internal.state.playing) {
+			stalledTicks = 0
+			lastTime = audio.currentTime
+			return
+		}
+		if (audio.currentTime === lastTime) {
+			if (++stalledTicks >= 3) {
+				// ~6s of no progress
+				stalledTicks = 0
+				logReconnect('watchdog-stall')
+				connect()
+			}
+		} else {
+			stalledTicks = 0
+			internal.reconnectAttempt = 0 // reset backoff only on *real* progress
+		}
+		lastTime = audio.currentTime
+	}, 2000)
 
 	document.addEventListener('visibilitychange', () => {
 		if (internal.state.wantPlaying && document.visibilityState === 'visible') {
