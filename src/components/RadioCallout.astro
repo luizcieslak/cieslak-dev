@@ -6,6 +6,7 @@ const t = useTranslations(lang)
 
 const labelPlay = t('radio.play')
 const labelPause = t('radio.pause')
+const labelOpen = t('radio.title')
 ---
 
 <aside
@@ -45,7 +46,11 @@ const labelPause = t('radio.pause')
 	<span class='radio-callout-label radio-nav-badge whitespace-nowrap !border-0 px-8 text-base'
 		>lofi radio</span
 	>
-	<div class='radio-callout-now-playing relative z-[1] flex min-w-0 items-center gap-3'>
+	<a
+		class='radio-callout-now-playing relative z-[1] flex min-w-0 items-center gap-3 hover:opacity-80'
+		href={`/${lang}/radio`}
+		aria-label={labelOpen}
+	>
 		<span class='radio-callout-cover-frame relative flex-none h-12 w-12'>
 			<img
 				class='radio-callout-track-cover relative z-[1] block h-full w-full rounded bg-muted object-cover'
@@ -58,7 +63,7 @@ const labelPause = t('radio.pause')
 			<p class='radio-callout-track-title truncate text-sm font-medium leading-tight'></p>
 			<p class='radio-callout-track-artist truncate text-xs leading-tight opacity-70'></p>
 		</div>
-	</div>
+	</a>
 </aside>
 
 <style is:inline>
@@ -125,6 +130,13 @@ const labelPause = t('radio.pause')
 	document.addEventListener('astro:page-load', () => {
 		const callouts = document.querySelectorAll<HTMLElement>('.radio-callout')
 		if (callouts.length === 0) return
+
+		const lang = location.pathname.split('/')[1] === 'pt-br' ? 'pt-br' : 'en'
+		callouts.forEach(callout => {
+			callout
+				.querySelector<HTMLAnchorElement>('.radio-callout-now-playing')
+				?.setAttribute('href', `/${lang}/radio`)
+		})
 
 		const audio = document.getElementById('radio-audio') as HTMLAudioElement | null
 		if (!audio) return
