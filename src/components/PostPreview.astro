@@ -21,7 +21,7 @@ const TitleTag = headingLevel
 
 <a
 	class:list={['flex justify-between items-start gap-8 group', className]}
-	href={from === 'home' ? post.slug.replace(lang, 'blog') : post.slug.split('/')[1]}
+	href={`${from === 'home' ? post.slug.replace(lang, 'blog') : post.slug.split('/')[1]}/`}
 >
 	<div class='grow'>
 		<TitleTag
