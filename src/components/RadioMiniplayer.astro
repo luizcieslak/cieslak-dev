@@ -109,7 +109,7 @@ const labels = {
 		const link = document.getElementById('radio-miniplayer-link')
 		if (!link) return
 		const lang = location.pathname.split('/')[1] === 'pt-br' ? 'pt-br' : 'en'
-		link.setAttribute('href', `/${lang}/radio`)
+		link.setAttribute('href', `/${lang}/radio/`)
 	}
 
 	declare global {

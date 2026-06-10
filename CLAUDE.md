@@ -156,7 +156,13 @@ Configured in [astro.config.mjs](astro.config.mjs#L16-L23):
 
 The site enforces **trailing slashes on every URL**: `trailingSlash: 'always'` in [astro.config.mjs](astro.config.mjs) and `"trailingSlash": true` in [vercel.json](vercel.json) (Vercel 308-redirects no-slash → slash in prod). This keeps URLs consistent with the canonical tag, hreflang links, and sitemap — all of which use the slash form — so there's no duplicate-content risk.
 
-**Consequence:** any internal link you build **by hand** (string-concatenated `href`, not via `Astro.url.pathname`) MUST end with `/`, e.g. `` `/${lang}/radio/` `` not `` `/${lang}/radio` ``. Without the slash the dev server returns a **404** (and prod does a needless extra 308 hop). Helpers like `translatePath` ([src/i18n/utils.ts](src/i18n/utils.ts)) and the `PostPreview` href already append it — match that pattern when adding new links.
+**Consequence:** any internal link you build **by hand** MUST end with `/`, e.g. `` `/${lang}/radio/` `` not `` `/${lang}/radio` ``. Without the slash the dev server returns a **404** (and prod does a needless extra 308 hop). This applies in three places, all easy to miss:
+
+1. **Astro markup** — string-concatenated `href` attributes (not those derived from `Astro.url.pathname`, which already carry the slash).
+2. **Client scripts** — runtime `el.setAttribute('href', …)` / `el.href = …`. The radio components re-set their link href on `astro:page-load`, which silently **overwrites** a correct markup href with a slashless one if you forget. Both the markup and the script must use the slash.
+3. **Markdown/MDX content** — hand-written cross-post links like `[here](/en/blog/slug/)`.
+
+Helpers like `translatePath` ([src/i18n/utils.ts](src/i18n/utils.ts)) and the `PostPreview` href already append it — match that pattern when adding new links.
 
 ### Styling
 
