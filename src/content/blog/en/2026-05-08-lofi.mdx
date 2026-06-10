@@ -30,10 +30,9 @@ I started listening to the genre more or less when the graduating from college w
 
 At that point creating the playlist would be enough but as an engineer that _sometimes_ overengineer things, I decided to build a **whole radio station from scratch**. This is a blog post that goes over the whole process in depth. All the code you see here is open-source so you can create your own version if you'd like.
 
-To continue reading to this article, I invite you to turn it on below so we can hear the music together.
+Before continuing reading, what if we listen to the music together?
 
 <RadioCallout />
-
 
 # How a (lofi) radio could work
 
@@ -42,7 +41,7 @@ To continue reading to this article, I invite you to turn it on below so we can 
 	<img src="/lofi/diagram-v.png" alt="Diagram of how the radio is working" />
 </picture>
 
-This below is the diagram of how it is working right now. All the code used here is open source on this repositories
+Below we have the diagram of how it is working right now. All the code used here is open source on this repositories:
 
 * [this blog here or lofi.md]() The client side consuming the audio stream and interacting with the server via HTTP requests and SSE.
 * [lofi-radio]() Server aplication using Bun. Store the files, streams the audio and holds the Admin UI.
@@ -53,7 +52,7 @@ We will deep dive in each of these parts in the following sections.
 
 # Client side
 
-The client side consumes 2 APIS
+The client side consumes 2 APIs:
 
 * Audio stream via HTTP request that return a stream of bytes.
 * Metadata information about the track via Server Sent Events (SSE). It pings the client with the information about the current track being played.

@@ -13,8 +13,8 @@ const strings = {
 		stalls: 'stalls',
 		seconds: 's buffered',
 		lanes: [
-			{ kind: 'naive', label: 'no burst', sub: 'joins at live edge' },
-			{ kind: 'burst', label: 'burst-on-connect', sub: '~4 s cushion' },
+			{ kind: 'naive', label: 'no buffer', sub: 'live edge' },
+			{ kind: 'burst', label: 'burst-on-connect', sub: '~4 s buffered' },
 		],
 	},
 	'pt-br': {
@@ -22,8 +22,8 @@ const strings = {
 		stalls: 'travamentos',
 		seconds: 's no buffer',
 		lanes: [
-			{ kind: 'naive', label: 'sem buffer', sub: 'entra na borda ao vivo' },
-			{ kind: 'burst', label: 'burst ao conectar', sub: '~4 s de folga' },
+			{ kind: 'naive', label: 'sem buffer', sub: 'borda ao vivo' },
+			{ kind: 'burst', label: 'burst ao conectar', sub: '~4 s no buffer' },
 		],
 	},
 }[lang]
@@ -39,17 +39,18 @@ const strings = {
 		{
 			lang === 'en' ? (
 				<>
-					Both listeners get the <em>exact same</em> jittery network. The one that joins at the live edge runs its
-					buffer near empty, so every network hiccup becomes an audible gap. The one handed a{' '}
-					<span class='font-mono'>burst-on-connect</span> cushion — a few seconds of recent frames replayed
-					instantly — rides straight through the same hiccups.
+					A real-time stream hands out audio just fast enough to play it — <em>never</em> faster. The same jittery
+					network feeds both gauges; the only difference is how much is buffered ahead. With almost nothing buffered,
+					every hiccup drains it to empty and you hear a gap. A few seconds of cushion — what{' '}
+					<span class='font-mono'>burst-on-connect</span> installs the moment you connect — absorbs the same hiccups.
 				</>
 			) : (
 				<>
-					Os dois ouvintes recebem <em>exatamente</em> a mesma rede instável. O que entra na borda ao vivo mantém o
-					buffer quase vazio, então cada engasgo da rede vira uma falha audível. O que recebe a folga do{' '}
-					<span class='font-mono'>burst-on-connect</span> — alguns segundos de frames recentes reproduzidos de
-					imediato — atravessa os mesmos engasgos sem parar.
+					Uma stream em tempo real entrega o áudio rápido o suficiente para tocá-lo — <em>nunca</em> mais rápido. A
+					mesma rede instável alimenta os dois medidores; a única diferença é quanto há no buffer à frente. Com quase
+					nada no buffer, cada engasgo o esvazia e você ouve uma falha. Alguns segundos de folga — o que o{' '}
+					<span class='font-mono'>burst-on-connect</span> instala no momento em que você conecta — absorvem os mesmos
+					engasgos.
 				</>
 			)
 		}
