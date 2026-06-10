@@ -118,18 +118,24 @@ Inside the MP3 format, there are several ways of compressing the data. the most 
 
 For each frame of an audio, it stores exactly 1152 audio samples. Therefore, if the track has 44.1kHz sampling rate, and MPEG-1 Layer 3 holds 1152 samples, each frame duration is ~26ms (need fuurther explanation about the frame duration, still confusing af).
 
-<FrameDurationDemo lang="pt-br" />
+Each MPEG-1 Layer III frame carries exactly 1152 audio samples. Divide by the sample rate and you get how long a single frame lasts — the cadence the server has to hold.
+
+<FrameDurationDemo lang="en" />
 
 explain how a stream server works. like someone giving cards into a table. every player should have the same amount of cards at the same time. a radio transmission works like that, where you need to tune into a station and then receive the broadcast from it.
 
-<FanOutDemo lang="pt-br" />
+One frame goes out every `26 ms` to _every_ listener at once. Tune in late and the song doesn't restart — you join right where it is now, exactly like a radio.
+
+<FanOutDemo lang="en" />
 
 explain we need to respect that number in streaming. why setTimeout() can't be used. 
 need the PreciseTimer to be able to respond in the sub-millisecond range.
 
 setTimeout works in a best-effort way when it comes to precise milliseconds. It can't guarantee something will way to be executed in exact 26ms. It can be 26, 24, 32ms, depending how soon the CPU can handle that process. We gotta remind ourselves that server aplications are CPU-bound and therefore share the Operational System resources like any other process running alongside it.
 
-<PreciseTimerDemo lang="pt-br" />
+Every `26 ms` the server must hand out one MP3 frame. A naive `setTimeout` loop drifts off the grid; the clock-correcting `PreciseTimer` stays locked to it.
+
+<PreciseTimerDemo lang="en" />
 
 ## A head start so it doesn't stutter
 
@@ -139,7 +145,9 @@ draft notes: pacing one frame every 26ms is exactly real-time, never faster. so 
 
 draft notes: the fix is burst-on-connect — the server keeps a small ring buffer of the most recently broadcast frames and replays it the instant a client connects, so the decoder starts with a few seconds of runway instead of nothing. same trick Icecast/Shoutcast use.
 
-<BufferCushionDemo lang="pt-br" />
+A real-time stream hands out audio just fast enough to play it — _never_ faster. The same jittery network feeds both gauges; the only difference is how much is buffered ahead. With almost nothing buffered, every hiccup drains it to empty and you hear a gap. A few seconds of cushion — what `burst-on-connect` installs the moment you connect — absorbs the same hiccups.
+
+<BufferCushionDemo lang="en" />
 
 draft notes: the tradeoff — that listener now starts a few seconds behind the live edge, so "perfect sync" from the fan-out section becomes "perfect sync within the burst window." fine for radio. tie back to the earlier claim explicitly.
 
@@ -172,3 +180,7 @@ The cool thing about Shelf is that, after we sync the playlists between all plat
 
 # Next steps
 
+- [ ] First DMCA Takedown Notice
+- [ ] Normalize the MP3 tracks in the server so they are all in 44.1kHz bitrate
+- [ ] Strengthen the Admin UI in the server to be more than just a simple secret
+- [ ] Open up a YouTube live video streaming the radio, perhaps even with a comissioned (make by a real human) art.

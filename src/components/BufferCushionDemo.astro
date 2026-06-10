@@ -35,27 +35,6 @@ const strings = {
 	data-stalls-word={strings.stalls}
 	data-seconds-word={strings.seconds}
 >
-	<figcaption class='mb-5 text-sm leading-relaxed opacity-80'>
-		{
-			lang === 'en' ? (
-				<>
-					A real-time stream hands out audio just fast enough to play it — <em>never</em> faster. The same jittery
-					network feeds both gauges; the only difference is how much is buffered ahead. With almost nothing buffered,
-					every hiccup drains it to empty and you hear a gap. A few seconds of cushion — what{' '}
-					<span class='font-mono'>burst-on-connect</span> installs the moment you connect — absorbs the same hiccups.
-				</>
-			) : (
-				<>
-					Uma stream em tempo real entrega o áudio rápido o suficiente para tocá-lo — <em>nunca</em> mais rápido. A
-					mesma rede instável alimenta os dois medidores; a única diferença é quanto há no buffer à frente. Com quase
-					nada no buffer, cada engasgo o esvazia e você ouve uma falha. Alguns segundos de folga — o que o{' '}
-					<span class='font-mono'>burst-on-connect</span> instala no momento em que você conecta — absorvem os mesmos
-					engasgos.
-				</>
-			)
-		}
-	</figcaption>
-
 	<div class='buffer-cushion-lanes grid items-center gap-x-3 gap-y-2.5' style='grid-template-columns: max-content 1fr;'>
 		{
 			strings.lanes.map(lane => (

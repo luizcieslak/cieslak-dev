@@ -23,15 +23,11 @@ const total0 = Math.round(fps0 * 180)
 
 const strings = {
 	en: {
-		caption:
-			'Each MPEG-1 Layer III frame carries exactly 1152 audio samples. Divide by the sample rate and you get how long a single frame lasts — the cadence the server has to hold.',
 		samples: 'samples',
 		perFrame: 'per frame',
 		derived: '≈ {fps} frames per second · ~{total} frames in a 3-minute track',
 	},
 	'pt-br': {
-		caption:
-			'Cada frame de MPEG-1 Layer III carrega exatamente 1152 amostras de áudio. Divida pela taxa de amostragem e você tem quanto dura um único frame — a cadência que o servidor precisa manter.',
 		samples: 'amostras',
 		perFrame: 'por frame',
 		derived: '≈ {fps} frames por segundo · ~{total} frames numa música de 3 minutos',
@@ -44,8 +40,6 @@ const strings = {
 	data-locale={locale}
 	data-derived-tpl={strings.derived}
 >
-	<figcaption class='mb-5 text-sm leading-relaxed opacity-80'>{strings.caption}</figcaption>
-
 	<div class='flex flex-wrap items-baseline gap-x-2 gap-y-1 font-mono text-base sm:text-lg'>
 		<span class='font-semibold'>{nf.format(SAMPLES)}</span>
 		<span class='text-xs opacity-50'>{strings.samples}</span>

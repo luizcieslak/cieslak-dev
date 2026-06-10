@@ -31,24 +31,6 @@ const strings = {
 	class='precise-timer-demo not-prose my-10 rounded-lg border border-main/20 bg-muted/30 p-4 sm:p-6'
 	data-frame-label={strings.frameLabel}
 >
-	<figcaption class='mb-5 text-sm leading-relaxed opacity-80'>
-		{
-			lang === 'en' ? (
-				<>
-					Every <span class='font-mono'>26&nbsp;ms</span> the server must hand out one MP3 frame. A naive{' '}
-					<span class='font-mono'>setTimeout</span> loop drifts off the grid; the clock-correcting{' '}
-					<span class='font-mono'>PreciseTimer</span> stays locked to it.
-				</>
-			) : (
-				<>
-					A cada <span class='font-mono'>26&nbsp;ms</span> o servidor precisa entregar um frame de MP3. Um loop
-					ingênuo com <span class='font-mono'>setTimeout</span> vai escorregando para fora da grade; o{' '}
-					<span class='font-mono'>PreciseTimer</span>, que se corrige pelo relógio, permanece travado nela.
-				</>
-			)
-		}
-	</figcaption>
-
 	<div class='precise-timer-lanes grid items-center gap-x-3 gap-y-2.5' style='grid-template-columns: max-content 1fr;'>
 		{
 			strings.lanes.map(lane => (
