@@ -135,7 +135,7 @@ const labelOpen = t('radio.title')
 		callouts.forEach(callout => {
 			callout
 				.querySelector<HTMLAnchorElement>('.radio-callout-now-playing')
-				?.setAttribute('href', `/${lang}/radio`)
+				?.setAttribute('href', `/${lang}/radio/`)
 		})
 
 		const audio = document.getElementById('radio-audio') as HTMLAudioElement | null
