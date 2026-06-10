@@ -13,6 +13,7 @@ import AmbientPaletteSandbox from '../../../components/AmbientPaletteSandbox.ast
 import PreciseTimerDemo from '../../../components/PreciseTimerDemo.astro'
 import FrameDurationDemo from '../../../components/FrameDurationDemo.astro'
 import FanOutDemo from '../../../components/FanOutDemo.astro'
+import BufferCushionDemo from '../../../components/BufferCushionDemo.astro'
 
 
 ![The classic "LoFi Girl" image but with a reinterpretation of its art imagining if she lived in Brazil.](/lofi/lofi.png)
@@ -118,20 +119,30 @@ Inside the MP3 format, there are several ways of compressing the data. the most 
 
 For each frame of an audio, it stores exactly 1152 audio samples. Therefore, if the track has 44.1kHz sampling rate, and MPEG-1 Layer 3 holds 1152 samples, each frame duration is ~26ms (need fuurther explanation about the frame duration, still confusing af).
 
-<FrameDurationDemo lang="en" />
+<FrameDurationDemo lang="pt-br" />
 
 explain how a stream server works. like someone giving cards into a table. every player should have the same amount of cards at the same time. a radio transmission works like that, where you need to tune into a station and then receive the broadcast from it.
 
-<FanOutDemo lang="en" />
+<FanOutDemo lang="pt-br" />
 
 explain we need to respect that number in streaming. why setTimeout() can't be used. 
 need the PreciseTimer to be able to respond in the sub-millisecond range.
 
 setTimeout works in a best-effort way when it comes to precise milliseconds. It can't guarantee something will way to be executed in exact 26ms. It can be 26, 24, 32ms, depending how soon the CPU can handle that process. We gotta remind ourselves that server aplications are CPU-bound and therefore share the Operational System resources like any other process running alongside it.
 
-<PreciseTimerDemo lang="en" />
+<PreciseTimerDemo lang="pt-br" />
 
+## A head start so it doesn't stutter
 
+{/* DRAFT — burst-on-connect / buffer cushion. flesh this out. */}
+
+draft notes: pacing one frame every 26ms is exactly real-time, never faster. so a listener who just connected has an empty buffer and joins right at the live edge — the same "everyone on the same frame" idea from the fan-out section. problem: with zero cushion, any network jitter drains the buffer to zero and the audio stutters (the browser fires a `waiting` event, you hear a "chop").
+
+draft notes: the fix is burst-on-connect — the server keeps a small ring buffer of the most recently broadcast frames and replays it the instant a client connects, so the decoder starts with a few seconds of runway instead of nothing. same trick Icecast/Shoutcast use.
+
+<BufferCushionDemo lang="pt-br" />
+
+draft notes: the tradeoff — that listener now starts a few seconds behind the live edge, so "perfect sync" from the fan-out section becomes "perfect sync within the burst window." fine for radio. tie back to the earlier claim explicitly.
 
 visuals? how mp3 frame parser works, timer stuff
 maybe a visualizer on each frame, dunno

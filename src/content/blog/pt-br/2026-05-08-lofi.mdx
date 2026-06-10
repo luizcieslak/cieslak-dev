@@ -13,6 +13,7 @@ import AmbientPaletteSandbox from '../../../components/AmbientPaletteSandbox.ast
 import PreciseTimerDemo from '../../../components/PreciseTimerDemo.astro'
 import FrameDurationDemo from '../../../components/FrameDurationDemo.astro'
 import FanOutDemo from '../../../components/FanOutDemo.astro'
+import BufferCushionDemo from '../../../components/BufferCushionDemo.astro'
 
 
 ![A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.](/lofi/lofi.png)
@@ -127,6 +128,10 @@ need the PreciseTimer to be able to respond in the sub-millisecond range.
 setTimeout works in a best-effort way when it comes to precise milliseconds. It can't guarantee something will way to be executed in exact 26ms. It can be 26, 24, 32ms, depending how soon the CPU can handle that process. We gotta remind ourselves that server aplications are CPU-bound and therefore share the Operational System resources like any other process running alongside it.
 
 <PreciseTimerDemo lang="pt-br" />
+
+buffer explanation
+
+<BufferCushionDemo lang="en" />
 
 
 
