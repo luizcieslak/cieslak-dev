@@ -152,6 +152,12 @@ Configured in [astro.config.mjs](astro.config.mjs#L16-L23):
 - All routes are prefixed with locale (including default)
 - Root `/` redirects to `/en/`
 
+### Trailing Slashes (important for internal links)
+
+The site enforces **trailing slashes on every URL**: `trailingSlash: 'always'` in [astro.config.mjs](astro.config.mjs) and `"trailingSlash": true` in [vercel.json](vercel.json) (Vercel 308-redirects no-slash → slash in prod). This keeps URLs consistent with the canonical tag, hreflang links, and sitemap — all of which use the slash form — so there's no duplicate-content risk.
+
+**Consequence:** any internal link you build **by hand** (string-concatenated `href`, not via `Astro.url.pathname`) MUST end with `/`, e.g. `` `/${lang}/radio/` `` not `` `/${lang}/radio` ``. Without the slash the dev server returns a **404** (and prod does a needless extra 308 hop). Helpers like `translatePath` ([src/i18n/utils.ts](src/i18n/utils.ts)) and the `PostPreview` href already append it — match that pattern when adding new links.
+
 ### Styling
 
 - **Framework:** Tailwind CSS with custom configuration
