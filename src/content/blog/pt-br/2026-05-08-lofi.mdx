@@ -26,7 +26,7 @@ Nesse ponto, realmente fazer _só_ uma playlist seria mais que suficiente. Poré
 
 Este é um post sobre o processo de construção da rádio que aprofunda em vários conceitos de matemática e programação. Todo o código que você vê aqui é _open-source_, e portanto aberto para que qualquer pessoa possa construir sua própria versão se quiser.
 
-Antes de começar a ler esse artigo, eu lhe convido a escutar a rádio abaixo, assim podemos ouvir a música juntos.
+Antes de começar a ler esse artigo, bora escutar a rádio juntos? só apertar o play aqui em baixo.
 
 <RadioCallout />
 
@@ -40,20 +40,19 @@ Antes de começar a ler esse artigo, eu lhe convido a escutar a rádio abaixo, a
 
 O diagrama acima representa como a rádio que vc escuta está funcionando nesse momento. Todo o código usado está disponível nesses repositórios:
 
-* [player]() A parte do _client_ que consome a _stream_ de aúdio e APIs via HTTP e SSE _(Server sent events)_
+* [player]() A parte do navegador que consome a _stream_ de aúdio e APIs via HTTP e SSE _(Server sent events)_
 * [lofi-radio]() Aplicação do servidor usando Bun. Armazena os arquivos físicos, cria a _stream_ de áudio e a interface de admin.
 * [shelf]() Gerenciamento de playlist local e sincronização com aplicativos de música tipo Spotify and YouTube Music.
 
 # Client side
 
-A parte do _client_ consome 2 APIs principais. 
+A parte do navegador consome 2 APIs principais:
 
 * Audio _stream_ via requisição HTTP que retorna uma _stream de bytes_.
 * Metadados sobre as músicas via _Server Sent Events (SSE)._ Envia eventos para o _client_ com informações sobre a música que está tocando no momento
 * Metadata information about the track via Server Sent Events (SSE). It pings the client with the information about the current track being played.
 
-Se vc colocou a rádio pra tocar ali em cima, vc já está vendo os metadados no tocador, ou do lado direito do site se está no _desktop_ ou uma faixa em baixo se está no celular.
-
+Se vc colocou a rádio pra tocar ali em cima, vc já está vendo esses metadados no tocador, ou do lado direito do site se está no _desktop_ ou em baixo se estiver no celular.
 
 
 A tag [audio](https://developer.mozilla.org/pt-BR/docs/Web/HTML/Reference/Elements/audio) é bem simples nesse momento, mas tem uma lógica em volta dele para lidar com algumas questões tipo reconexões com o servidor.
@@ -62,9 +61,11 @@ Por fim, também possui mecanismos para a tela não apagar em celulares e també
 
 ## Capas de álbuns e gradiente esfumaçado
 
-Visualizar as capas de álbuns _enquanto_ a música toca é parte essencial da experiência. A arte de capa não esta ali por acaso geralmente e é criada das mesma maneira que as músicas são.
+Observar as capas de álbuns _enquanto_ a música toca é parte essencial da experiência. A arte de capa não esta ali por acaso geralmente e é criada das mesma maneira que as músicas são.
 
-Usando isso como base, temos que **o elemento mais importante na página do rádio é essa capa.** É o maior elemento da página e em volta dela há um efeito gradiente de _blur_ das cores que são extraídas da imagem.
+Tendo isso como base, **o elemento mais importante na página do rádio é justamente essa capa.** É o maior elemento da página e em volta dela há um efeito gradiente de _blur_ das cores que são extraídas da imagem.
+
+/** image */
 
 O efeito se chama `AmbientGlow` e fica no arquivo [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). Resumido, o efeito coloca a imagem em uma grade, extrai a cor predominante em cada segmento e desenha camadas de gradiente circulares atrás da imagem. Dê uma fuçada com os controles abaixo, cada _slider_ controla um dos argumentos de `GlowOptions` que o rádio passa na função de `mount()`. 
 
@@ -82,71 +83,80 @@ const key = `${Math.floor(r / binSize)},${Math.floor(g / binSize)},${Math.floor(
 counts.set(key, (counts.get(key) || 0) + 1)
 ```
 
-A cesta com maior número vence, e sua cor é reconstituída também em uma configuração tripla de `{ r, g, b }`. A variável `binSize` controla o quão "grande" são essas cestas: quanto maior são, mais cores e tons parecidos são unificados em uma cor dominante, cestas pequenas preservam as pequenas variações de cor ao custo de fragmentar a votação da cor dominante. Os filtros de preto e branco existem porque geralmente fundos muito claros ou muito escuros dominariam sempre na contagem e portanto removeriam as cores importantes do gradiente, que são justamente o que estamos procurando no algoritmo.
+A cesta com maior número "vence", e sua cor é reconstituída também em uma configuração tripla de `{ r, g, b }`. A variável `binSize` controla o quão "grande" são essas cestas: quanto maior são, mais cores e tons parecidos são unificados em uma cor dominante, cestas pequenas preservam as pequenas variações de cor ao custo de fragmentar a votação da cor dominante. Os filtros de preto e branco existem porque geralmente fundos muito claros ou muito escuros dominariam sempre na contagem e portanto removeriam as cores importantes do gradiente, que são justamente o que estamos procurando no algoritmo.
 
 Exemplo do algoritmo rodando em uma grade 4x4 para que na prática vemos quais são essas cores.
 
 <AmbientPaletteSandbox />
 
-O que é muito louco pra mim é que esse algoritmo pode ser usado para "pixelar" uma imagem se vc for longe aumentando o tamanho da grade:
+O que é muito louco pra mim é que esse algoritmo pode ser usado também para "pixelar" uma imagem se vc for longe o suficiente aumentando o tamanho da grade:
 
 <video class='w-full' autoplay muted loop playsinline src="/lofi/pixels3.mp4" />
 
 Hoje em dia com monitores super tecnológicos rodando até em resoluções Ultra HD 8k é dificil de lembrar que o que está na nossa frente é de fato uma grade de pixels, muitos pixels, na verdade bilhões de pixels que passam na tela a cada segundo.
 
-# Parte do servidor
+# O Servidor
 
+Agora sobre a parte do servidor: É uma aplicação feira em Bun que roda a lógica de _streaming_ do áudio enviando _frames_ para cada ouvinte.
 
-state json explanation
-resilience when restarting or crash
-playlist state
+Como queremos simular o comportamento de um rádio, todos os ouvintes precisam receber a mesma quantidade de _frames_ ao mesmo tempo, ou seja, **ouvir a mesma parta da música**. Se um ouvinte entrar "atrasado" na rádio, ele começa a ouvir no meio da música, assim como um ouvinte que estava antes vai ouvir aquela mesma parte. 
 
-## Algo enviado a cada 26ms
+<FanOutDemo lang="pt-br" />
 
-Não exatamente a cada 26 milissegundos, mas esse número vem de como lemos os _frames_ de um arquivo MP3.
+## Algo precisa ir a cada 26 milissegundos
 
-Voltando um pouco na história da internet: Os arquivos MP3 quando lançado revolucionou o jeito em que lidávamos com audio com uma eficiente compressão de tamanho enquanto mantém uma ótima qualidade de som.
+Esse número resulta de como interpretamos cada _frame_ de um arquivo MP3.
+
+O formato MP3 é amplamente utilizado para armazenar e transportar arquivos de áudio. Ele é muito eficiente para comprimir o tamanho de um arquivo de áudio enquanto mantém a qualidade do som.
 
 ![Um tocador MP3 antigo que revolucionou o conceito de musica portátil](/lofi/mp3-stick.webp)
 (quem tinha um desses aparelhos sabe o que eu estou falando)
 
-Dentro do formato MP3, há varios tipos de compressão de dados. A mais utilizada se chama _MPEG-1 Layer 3_, que é justamente a compressão que perde um pouco da qualidade da música mas que é tem um tamanho bem enxuto.
+Dentro da especificação de arquivos MP3, há varios tipos de compressão de dados. A mais utilizada se chama **MPEG-1 Layer 3**, que é uma compressão que perde um pouco da qualidade da música mas que resulta em um tamanho bem pequeno no final. 
 
-(need to also explain about the 44.1kHz sampling rate)
+Esse formato de compressão estabelece que **cada frame de um áudio armazena exatamente 1152 amostras de som**. Agora, existe uma métrica em áudio digital chamada de **taxa de amostragem**, que basicamente nos diz quantas vezes por segundo o sinal de áudio analógico é convertido em 1's e 0's.
 
-Para cada _frame_ de um áudio, ele armazena exatamente 1152 "pedaços" de áudio. POrtanto, se a música tem um _sampling rate_ de 44.1 kHz, cada frame precisa ter uma duração de 26ms (calc).
-
-Cada frame de MPEG-1 Layer III carrega exatamente 1152 amostras de áudio. Divida pela taxa de amostragem e você tem quanto dura um único frame — a cadência que o servidor precisa manter.
+Na maioria dos áudios, temos uma taxa de amostragem de 44.1 kHz, o que significa que ele é quebrado em 44100 amostras por segundo. Portanto, se a especificação de compressão tiver 1152 amostras por _frame_ e estamos com  44100 amostras a cada segundo, **a duração de cada _frame_ é** `1152 / 44100 = 0.026` segundos, ou **26 ms**.
 
 <FrameDurationDemo lang="pt-br" />
 
-explain how a stream server works. like someone giving cards into a table. every player should have the same amount of cards at the same time. a radio transmission works like that, where you need to tune into a station and then receive the broadcast from it.
+Enfim, para que os ouvintes possam ouvir a música sem interrupções, precisamos enviar um novo _frame_ de áudio a cada 26 milissegundos e manter o servidor de _stream_ funcionando.
 
-Um frame sai a cada `26 ms` para _todos_ os ouvintes ao mesmo tempo. Se você chega atrasado, a música não recomeça — você entra exatamente onde ela está agora, igual a um rádio.
+Essa cadência de 26ms pode variar sed a taxa de amostragem mudar ou se é música é digitalizada de uma outra maneira. Esse número da cadência **precisa ser respeitado** se não a _stream_ vai sair toda cagada.
 
-<FanOutDemo lang="pt-br" />
+## Porque não dá pra usar setTimeout
 
-explain we need to respect that number in streaming. why setTimeout() can't be used. 
-need the PreciseTimer to be able to respond in the sub-millisecond range.
+Para uma implementação de "envie um _frame_ de áudio a cada 26ms", alguém poderia pensar em utilizar o `setTimeout` de maneira ingênua para fazer o código "esperar" esse tempo e enviar de novo.
 
-setTimeout works in a best-effort way when it comes to precise milliseconds. It can't guarantee something will way to be executed in exact 26ms. It can be 26, 24, 32ms, depending how soon the CPU can handle that process. We gotta remind ourselves that server aplications are CPU-bound and therefore share the Operational System resources like any other process running alongside it.
+```ts
+setTimeout(() => {
+  sendAudioFrame()
+}, 26) // funfa? acho que não.
+```
 
-A cada `26 ms` o servidor precisa entregar um frame de MP3. Um loop ingênuo com `setTimeout` vai escorregando para fora da grade; o `PreciseTimer`, que se corrige pelo relógio, permanece travado nela.
+`setTimeout` functiona numa abordagem de melhor esforço quando falamos de precisão na casa dos milissegundos. **Não dá para garantir que o código irá esperar exatamente 26ms**. Pode ser 26, 24, 32ms, dependendo de quão cedo o processador consegue lidar com esse processo. Nós devemos lembrar que as aplicações rodando nos servidores compartilham os recursos com o sistema operacional, assim como qualquer outro processo rodando ao lado.
+
+Então, se isso não funciona, o que fazer? Bom, precisamos implementar algo chamado `PreciseTimer` que consegue responder em um intervalo de milissegundos.
+
+Ele funciona através do cálculo de quanto tempo foi gastado para transmitir o _frame_ de áudio e espera a diferença de tempo para que o total seja `26ms`:
+
+Every `26 ms` the server must hand out one MP3 frame. A naive `setTimeout` loop drifts off the grid; the clock-correcting `PreciseTimer` stays locked to it.
 
 <PreciseTimerDemo lang="pt-br" />
 
-buffer explanation
+## No mundo real, precisamos de um buffer
+
+Poderíamos continuar enviandos um _frame_ de áudio a cada 26ms que isso iria funcionar na teoria. Porém o mundo real não é tão simples assim: Conexões ruins de celular, latência e CPUs lentas podem afetar a experiência da escuta e no final você acabaria com um áudio todo travado. 
+
+Para evitar esse problema, o servidor mantém uma "gordura" de _buffer_ da transmissão de áudio mais recente e repete ela no instante que um novo ouvinte se conecta, fazendo com que o decodificador tenta alguns segundos de segurança ao invés de nada.
 
 Uma stream em tempo real entrega o áudio rápido o suficiente para tocá-lo — _nunca_ mais rápido. A mesma rede instável alimenta os dois medidores; a única diferença é quanto há no buffer à frente. Com quase nada no buffer, cada engasgo o esvazia e você ouve uma falha. Alguns segundos de folga — o que o `burst-on-connect` instala no momento em que você conecta — absorvem os mesmos engasgos.
 
 <BufferCushionDemo lang="pt-br" />
 
+## Ler arquivos é uma operação que custa
 
-
-visuals? how mp3 frame parser works, timer stuff
-maybe a visualizer on each frame, dunno
-stream and sse events
-
+Operações de leitura e escrita de arquivos são geralmente custosas. Para o rádio, n
 
 # Arquivos
 
