@@ -156,7 +156,7 @@ Uma stream em tempo real entrega o áudio rápido o suficiente para tocá-lo —
 
 ## Ler arquivos é uma operação que custa
 
-Operações de leitura e escrita de arquivos são geralmente custosas. Para o rádio, n
+Operações de leitura e escrita de arquivos são geralmente custosas. Para tocar a próxima música na rádio, a próxima leitura de arquivo é acionada alguns segundos _antes_ do fim da música atual, para que a rotina `mp3Parser` tenha tempo suficiente para rodar. Para também mitigar qualquer latência, a leitura do arquivo é feita em modo _async_.
 
 # Arquivos
 

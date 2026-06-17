@@ -160,7 +160,7 @@ A real-time stream hands out audio just fast enough to play it — _never_ faste
 
 ## Reading files are a expensive operation
 
-I/O operations are generally expensive. For the radio, we are triggeting the next file read a few seconds _before_ the current track ends so it has enough time for the `mp3Parser` function to run. To also migigate any latency, we read the file in _async_ mode.
+I/O operations are generally expensive.In order to play the next song, the next file read is triggered a few seconds _before_ the current track ends so it has enough time for the `mp3Parser` function to run. To also migigate any latency, we read the file in _async_ mode.
 
 # Tracks
 
