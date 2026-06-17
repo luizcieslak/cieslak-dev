@@ -66,7 +66,7 @@ Finally, we also have custom logic to prevent the screen to lock for mobile brow
 
 I believe artists put great thought into the album cover of their releases and the intention is to visualize it alongside the playing track. some of them are pretty dope as well.
 
-Thinking about it, **the most important element on the radio page should be the album cover**. It is the biggest element there and around it there is a custom blur gradient effect from the colors that are extracted from the image.
+Thinking about that, **the most important element on the radio page should be the album cover**. It is the biggest element there and around it there is a custom blur gradient effect from the colors that are extracted from the image.
 
 The effect lives in [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). At a high level it samples the cover image on a small grid, picks one dominant color per cell, and paints a stack of soft radial gradients on layers sitting behind the image. Have a play with the controls below — every slider maps directly to a field of `GlowOptions` that the radio page passes into `mount()`.
 
@@ -90,7 +90,7 @@ Here's the same algorithm running on a 4×4 grid so you can see the palette it p
 
 <AmbientPaletteSandbox />
 
-What is crazy for me is that the exact same algorithm can be used to pixelize an image if you go long enough increasing the grid size. 
+What is crazy for me is that the exact same algorithm that can be used to pixelize an image if you go long enough increasing the grid size. 
 
 <video class='w-full' autoplay muted loop playsinline src="/lofi/pixels3.mp4" />
 
@@ -98,69 +98,65 @@ Nowadays with Ultra HD 8k screens it is easy to forget the image we see in front
 
 # Server side
 
-Now into the server side of things: A Bun application that runs the radio engine streaming out the audio frames to all listeners.
 
-Since we want to mimick the radio behavior, all listeners need to receive the same audio frames so at the same time. If a listener joins "late", it needs to pick up the song where it is currently playing, without further delay.
+state json explanation
+resilience when restarting or crash
+playlist state
 
-<FanOutDemo lang="en" />
+## something every 26ms
 
-## something needs to go every 26ms
+Not exactly every 26ms, but that number is coming from how we parse the MP3 frames.
 
-The number comes from how we parse the MP3 frames.
-
-Going back a little back in history: The MP3 format itself is widely used to store and transport audio files. It is very efficient to compress an audio file size while maintaing the quality.
+So, a little back in history: The MP3 format itself is widely used to store and transport audio files. It is very efficient to compress an audio file size while maintaing the quality.
 
 ![Um tocador MP3 antigo que revolucionou o conceito de musica portátil](/lofi/mp3-stick.webp)
 (the ones that had one of these know what I am talking about.)
 
-Inside the MP3 spec, there are several ways of compressing data. The most used of them, **MPEG-1 Layer 3**, is a very efficient lossy compression, meaning it can store the audio in a good quality while keeping the size file short. 
+Inside the MP3 format, there are several ways of compressing the data. the most used of them, MPEG-1 Layer 3, is a lossy compression that is very efficient in terms of compression ratio. This compression format states **each frame of an audio stores exactly 1152 samples**.
 
-This compression format states **each frame of an audio file stores exactly 1152 samples**. Now, there is another metric called **sampling rate**, which basically tell us how many times per second the analog audio signal is converted to 1's and 0's.
+(need to also explain about the 44.1kHz sampling rate)
 
-In most audios, we have a 44.1kHz sampling rate, meaning it samples the audio 44100 per second. Finally, if the compression spec has 1152 samples per frame and we usually sample 44100 per second, the frame duration is `1152 / 44100 = 0.026` seconds, or `26 ms`.
+For each frame of an audio, it stores exactly 1152 audio samples. Therefore, if the track has 44.1kHz sampling rate, and MPEG-1 Layer 3 holds 1152 samples, each frame duration is ~26ms (need fuurther explanation about the frame duration, still confusing af).
+
+Each MPEG-1 Layer III frame carries exactly 1152 audio samples. Divide by the sample rate and you get how long a single frame lasts — the cadence the server has to hold.
 
 <FrameDurationDemo lang="en" />
 
-Therefore, in order to the listener hear the song without interruptions, we need to send audio frame every 26ms and hold that cadence to avoid jittery. 
+explain how a stream server works. like someone giving cards into a table. every player should have the same amount of cards at the same time. a radio transmission works like that, where you need to tune into a station and then receive the broadcast from it.
 
-This 26ms cadence can vary if the sampling rate is different or the song is compressed in a different format. We **need to respect that number** otherwise the song will be all choppy.
+One frame goes out every `26 ms` to _every_ listener at once. Tune in late and the song doesn't restart — you join right where it is now, exactly like a radio.
 
-## Why setTimeout() can't be used
+<FanOutDemo lang="en" />
 
-A naive implementation of "send an audio frame every 26ms" would be to use `setTimeout` to send the frame and then wait for the next 26ms for doing it again
+explain we need to respect that number in streaming. why setTimeout() can't be used. 
+need the PreciseTimer to be able to respond in the sub-millisecond range.
 
-```ts
-setTimeout(() => {
-  sendAudioFrame()
-}, 26) // works? not quite.
-```
-
-`setTimeout` works in a best-effort way when it comes to precise milliseconds. It can't guarantee something will way to be executed in exact 26ms. It can be 26, 24, 32ms, depending how soon the CPU can handle that process. We gotta remind ourselves that server aplications are CPU-bound and therefore share the Operational System resources like any other process running alongside it.
-
-So if that doesn't work, what does? Well, we need to implement something called `PreciseTimer` that can respond in sub-millisecond range.
-
-We calculate how many time it takes to broadcast the audio frame and wait the difference so it adds up to the `26ms` we need to respect:
-
+setTimeout works in a best-effort way when it comes to precise milliseconds. It can't guarantee something will way to be executed in exact 26ms. It can be 26, 24, 32ms, depending how soon the CPU can handle that process. We gotta remind ourselves that server aplications are CPU-bound and therefore share the Operational System resources like any other process running alongside it.
 
 Every `26 ms` the server must hand out one MP3 frame. A naive `setTimeout` loop drifts off the grid; the clock-correcting `PreciseTimer` stays locked to it.
 
 <PreciseTimerDemo lang="en" />
 
-## Real world needs a buffer
+## A head start so it doesn't stutter
 
-We could keep sending audio frames every 26ms only and that would work in theory. But the real world is not that simple: Poor network connections, latency and slow CPUs can affect the hearing experience and you would ended up with a choppy audio.
+{/* DRAFT — burst-on-connect / buffer cushion. flesh this out. */}
 
-To avoid this problem, the server keeps a small ring buffer of the most recently broadcast frames and replays it the instant a client connects, so the decoder starts with a few seconds of runway instead of nothing. 
+draft notes: pacing one frame every 26ms is exactly real-time, never faster. so a listener who just connected has an empty buffer and joins right at the live edge — the same "everyone on the same frame" idea from the fan-out section. problem: with zero cushion, any network jitter drains the buffer to zero and the audio stutters (the browser fires a `waiting` event, you hear a "chop").
+
+draft notes: the fix is burst-on-connect — the server keeps a small ring buffer of the most recently broadcast frames and replays it the instant a client connects, so the decoder starts with a few seconds of runway instead of nothing. same trick Icecast/Shoutcast use.
 
 A real-time stream hands out audio just fast enough to play it — _never_ faster. The same jittery network feeds both gauges; the only difference is how much is buffered ahead. With almost nothing buffered, every hiccup drains it to empty and you hear a gap. A few seconds of cushion — what `burst-on-connect` installs the moment you connect — absorbs the same hiccups.
 
 <BufferCushionDemo lang="en" />
 
-## Reading files are a expensive operation
+draft notes: the tradeoff — that listener now starts a few seconds behind the live edge, so "perfect sync" from the fan-out section becomes "perfect sync within the burst window." fine for radio. tie back to the earlier claim explicitly.
 
-I/O operations are generally expensive. For the radio, we are triggeting the next file read a few seconds _before_ the current track ends so it has enough time for the `mp3Parser` function to run. To also migigate any latency, we read the file in _async_ mode.
+visuals? how mp3 frame parser works, timer stuff
+maybe a visualizer on each frame, dunno
+stream and sse events
 
-# Tracks
+
+# Files
 
 In this current version of the radio, it only supports MP3 files. In order to support more extensions, the same algorithm to determine the frame duration would need to be replicated to them so the frames constant cadence is maintainted in the stream level.
 
@@ -185,6 +181,6 @@ The cool thing about Shelf is that, after we sync the playlists between all plat
 # Next steps
 
 - [ ] First DMCA Takedown Notice
-- [ ] Normalize the MP3 tracks in the server so they are all in 44.1kHz sampling rate
+- [ ] Normalize the MP3 tracks in the server so they are all in 44.1kHz bitrate
 - [ ] Strengthen the Admin UI in the server to be more than just a simple secret
 - [ ] Open up a YouTube live video streaming the radio, perhaps even with a comissioned (make by a real human) art.
