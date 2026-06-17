@@ -31,7 +31,13 @@ const listeners = [
 
 const rows = [
 	{ key: 'broadcast', label: strings.broadcast, kind: 'broadcast', join: 0, late: false },
-	...listeners.map(l => ({ key: `l${l.n}`, label: `${strings.listener} ${l.n}`, kind: 'listener', join: l.join, late: l.late })),
+	...listeners.map(l => ({
+		key: `l${l.n}`,
+		label: `${strings.listener} ${l.n}`,
+		kind: 'listener',
+		join: l.join,
+		late: l.late,
+	})),
 ]
 ---
 
@@ -40,6 +46,23 @@ const rows = [
 	data-frame-tpl={strings.frameTpl}
 	data-frames='240'
 >
+	<figcaption class='mb-4 text-sm leading-relaxed opacity-80'>
+		{
+			lang === 'en' ? (
+				<>
+					One frame goes out every <span class='font-mono'>26&nbsp;ms</span> to <em>every</em> listener at
+					once. Late joiner wont make the song restart. You join right where it is now, exactly like a radio.
+				</>
+			) : (
+				<>
+					Um frame vai a cada <span class='font-mono'>26&nbsp;ms</span> para <em>todos</em> os ouvintes ao
+					mesmo tempo. Se você entra depois, a música não recomeça. você entra exatamente onde ela está agora,
+					igual a uma rádio.
+				</>
+			)
+		}
+	</figcaption>
+
 	<div class='fanout-stage grid items-center gap-x-3 gap-y-2' style='grid-template-columns: max-content 1fr;'>
 		{
 			rows.map(row => (
@@ -127,7 +150,16 @@ const rows = [
 		}
 		track.appendChild(now)
 
-		return { kind, join, late, label: labelCell, tag: labelCell.querySelector('.fanout-tag'), missed, fill, now }
+		return {
+			kind,
+			join,
+			late,
+			label: labelCell,
+			tag: labelCell.querySelector('.fanout-tag'),
+			missed,
+			fill,
+			now,
+		}
 	}
 
 	function initDemo(root: HTMLElement): () => void {

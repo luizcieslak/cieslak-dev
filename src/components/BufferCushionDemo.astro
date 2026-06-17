@@ -35,7 +35,30 @@ const strings = {
 	data-stalls-word={strings.stalls}
 	data-seconds-word={strings.seconds}
 >
-	<div class='buffer-cushion-lanes grid items-center gap-x-3 gap-y-2.5' style='grid-template-columns: max-content 1fr;'>
+	<figcaption class='mb-5 text-sm leading-relaxed opacity-80'>
+		{
+			lang === 'en' ? (
+				<>
+					A real-time stream would hand out audio just fast enough to play it, <em>never</em> faster. The same
+					jittery network feeds both bars below, the only difference is how much is buffered ahead. With
+					almost nothing buffered, every hiccup drains it to empty and you hear a gap. A few seconds of
+					cushion absorbs the same hiccups.
+				</>
+			) : (
+				<>
+					Uma stream em tempo real entregaria o áudio rápido o suficiente para tocá-lo,<em>nunca</em> mais
+					rápido. A mesma rede de internet instável alimenta as duas barras, a diferença é quanto buffer tem
+					na frente. Com quase nada no buffer, cada travada esvazia e vc a música dá uma travada. Alguns
+					segundos de buffer absorvem esses engasgos.
+				</>
+			)
+		}
+	</figcaption>
+
+	<div
+		class='buffer-cushion-lanes grid items-center gap-x-3 gap-y-2.5'
+		style='grid-template-columns: max-content 1fr;'
+	>
 		{
 			strings.lanes.map(lane => (
 				<Fragment>
@@ -58,19 +81,19 @@ const strings = {
 		{
 			lang === 'en' ? (
 				<>
-					A live stream sends exactly one frame per frame-duration — it never sends faster, so a fresh listener's
-					buffer starts at zero and stays razor-thin. One late packet and it underruns. Replaying the last few
-					seconds of frames the instant they connect gives the decoder something to coast on. The cost: that
-					listener is now a few seconds behind the live edge — "perfect sync" becomes "perfect sync within the burst
-					window."
+					A live stream sends exactly one frame per frame-duration — it never sends faster, so a fresh
+					listener's buffer starts at zero and stays razor-thin. One late packet and it underruns. Replaying
+					the last few seconds of frames the instant they connect gives the decoder something to coast on. The
+					cost: that listener is now a few seconds behind the live edge — "perfect sync" becomes "perfect sync
+					within the burst window."
 				</>
 			) : (
 				<>
-					Uma stream ao vivo envia exatamente um frame por duração de frame — nunca mais rápido, então o buffer de um
-					ouvinte novo começa em zero e fica raso demais. Um pacote atrasado e ele esvazia. Reproduzir os últimos
-					segundos de frames no instante em que ele conecta dá ao decoder uma folga para deslizar. O custo: esse
-					ouvinte fica alguns segundos atrás da borda ao vivo — a "sincronia perfeita" vira "sincronia perfeita
-					dentro da janela do burst".
+					Uma stream ao vivo envia exatamente um frame por duração de frame — nunca mais rápido, então o
+					buffer de um ouvinte novo começa em zero e fica raso demais. Um pacote atrasado e ele esvazia.
+					Reproduzir os últimos segundos de frames no instante em que ele conecta dá ao decoder uma folga para
+					deslizar. O custo: esse ouvinte fica alguns segundos atrás da borda ao vivo — a "sincronia perfeita"
+					vira "sincronia perfeita dentro da janela do burst".
 				</>
 			)
 		}
@@ -168,7 +191,9 @@ const strings = {
 		const readoutEl = root.querySelector<HTMLElement>('.bcd-readout')!
 
 		const tracks = Array.from(root.querySelectorAll<HTMLElement>('.bcd-track'))
-		const labels = Array.from(root.querySelectorAll<HTMLElement>('.buffer-cushion-lanes > div:not(.bcd-track)'))
+		const labels = Array.from(
+			root.querySelectorAll<HTMLElement>('.buffer-cushion-lanes > div:not(.bcd-track)'),
+		)
 		const lanes = tracks.map((track, i) => buildLane(track, labels[i], stallLabel))
 
 		function render() {
