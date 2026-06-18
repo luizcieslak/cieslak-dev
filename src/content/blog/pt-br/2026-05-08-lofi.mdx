@@ -14,6 +14,7 @@ import PreciseTimerDemo from '../../../components/PreciseTimerDemo.astro'
 import FrameDurationDemo from '../../../components/FrameDurationDemo.astro'
 import FanOutDemo from '../../../components/FanOutDemo.astro'
 import BufferCushionDemo from '../../../components/BufferCushionDemo.astro'
+import ThemeMedia from '../../../components/ThemeMedia.astro'
 
 
 ![A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.](/lofi/lofi.png)
@@ -65,7 +66,11 @@ Observar as capas de álbuns _enquanto_ a música toca é parte essencial da exp
 
 Tendo isso como base, **o elemento mais importante na página do rádio é justamente essa capa.** É o maior elemento da página e em volta dela há um efeito gradiente de _blur_ das cores que são extraídas da imagem.
 
-/** image */
+<ThemeMedia
+	light="/lofi/example-light.png"
+	dark="/lofi/example-dark.png"
+	alt="A capa do álbum e o efeito de blur aplicado a ela."
+/>
 
 O efeito se chama `AmbientGlow` e fica no arquivo [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). Resumido, o efeito coloca a imagem em uma grade, extrai a cor predominante em cada segmento e desenha camadas de gradiente circulares atrás da imagem. Dê uma fuçada com os controles abaixo, cada _slider_ controla um dos argumentos de `GlowOptions` que o rádio passa na função de `mount()`. 
 

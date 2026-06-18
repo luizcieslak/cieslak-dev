@@ -14,6 +14,7 @@ import PreciseTimerDemo from '../../../components/PreciseTimerDemo.astro'
 import FrameDurationDemo from '../../../components/FrameDurationDemo.astro'
 import FanOutDemo from '../../../components/FanOutDemo.astro'
 import BufferCushionDemo from '../../../components/BufferCushionDemo.astro'
+import ThemeMedia from '../../../components/ThemeMedia.astro'
 
 
 ![The classic "LoFi Girl" image but with a reinterpretation of its art imagining if she lived in Brazil.](/lofi/lofi.png)
@@ -69,7 +70,11 @@ Look and observe the album cover _while_ listening to the music **is a crucial p
 
 Thinking about it, **the most important element on the radio page should be the album cover**. It is the biggest element there and around it there is a custom blur gradient effect from the colors that are extracted from the image.
 
-/** image */
+<ThemeMedia
+	light="/lofi/example-light.png"
+	dark="/lofi/example-dark.png"
+	alt="The album cover and the blur effect that is applied to it."
+/>
 
 The effect lives in [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). At a high level it samples the cover image on a small grid, picks one dominant color per cell, and paints a stack of soft radial gradients on layers sitting behind the image. Have a play with the controls below — every slider maps directly to a field of `GlowOptions` that the radio page passes into `mount()`.
 
