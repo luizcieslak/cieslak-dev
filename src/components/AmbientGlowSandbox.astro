@@ -1,0 +1,245 @@
+---
+interface Props {
+	defaultImage?: string
+	defaultAlt?: string
+}
+
+const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Ambient glow sandbox preview' } = Astro.props
+---
+
+<figure class='ambient-glow-sandbox not-prose my-10 rounded-lg border border-main bg-muted/30 p-4'>
+	<div
+		class='ambient-glow-sandbox-stage relative mx-auto flex aspect-square w-full max-w-md items-center justify-center overflow-visible'
+	>
+		<img
+			class='ambient-glow-sandbox-img relative z-10 block h-[200px] w-full rounded-md object-cover shadow-md'
+			src={defaultImage}
+			alt={defaultAlt}
+			crossorigin='anonymous'
+		/>
+	</div>
+
+	<div class='mt-5 grid gap-3 text-sm'>
+		<label class='grid gap-y-1.5 sm:flex sm:items-center sm:gap-3'>
+			<span class='opacity-80 sm:w-32 sm:shrink-0'>Upload image</span>
+			<input class='ambient-glow-sandbox-upload min-w-0 sm:flex-1' type='file' accept='image/*' />
+		</label>
+
+		<!-- curated controls -->
+		<div class='ambient-glow-sandbox-controls grid gap-2'>
+			<!-- populated via data-* attributes; see <script> below -->
+		</div>
+
+		<button
+			type='button'
+			class='ambient-glow-sandbox-toggle-advanced mt-2 self-start text-xs underline opacity-70 hover:opacity-100'
+			aria-expanded='false'
+		>
+			Show advanced options
+		</button>
+		<div class='ambient-glow-sandbox-advanced hidden grid gap-2'>
+			<!-- populated via data-* attributes; see <script> below -->
+		</div>
+	</div>
+</figure>
+
+<script>
+	import { mount, type GlowOptions } from '../lib/ambient-glow'
+
+	type ControlKey = keyof GlowOptions
+
+	interface SliderSpec {
+		key: ControlKey
+		label: string
+		min: number
+		max: number
+		step: number
+		default: number
+	}
+
+	interface BoolSpec {
+		key: ControlKey
+		label: string
+		default: boolean
+	}
+
+	const CURATED: SliderSpec[] = [
+		{ key: 'blur', label: 'Blur', min: 0, max: 120, step: 1, default: 40 },
+		{ key: 'sizeMultiplier', label: 'Size multiplier', min: 1, max: 3, step: 0.05, default: 1.5 },
+		{ key: 'majorBlobCount', label: 'Major blob count', min: 1, max: 12, step: 1, default: 5 },
+		{ key: 'majorBlobOpacity', label: 'Major blob opacity', min: 0, max: 1, step: 0.01, default: 0.78 },
+		{ key: 'majorBlobRadius', label: 'Major blob radius', min: 5, max: 60, step: 1, default: 28 },
+		{ key: 'jitter', label: 'Jitter', min: 0, max: 50, step: 1, default: 18 },
+		{ key: 'horizontalStretch', label: 'Horizontal stretch', min: 0.5, max: 2.5, step: 0.05, default: 1.35 },
+		{ key: 'verticalStretch', label: 'Vertical stretch', min: 0.5, max: 2.5, step: 0.05, default: 1.1 },
+	]
+
+	const ADVANCED_SLIDERS: SliderSpec[] = [
+		{ key: 'gridSize', label: 'Grid size', min: 2, max: 8, step: 1, default: 4 },
+		{ key: 'fadeMs', label: 'Fade (ms)', min: 0, max: 3000, step: 50, default: 1000 },
+		{ key: 'binSize', label: 'Color bin size', min: 4, max: 128, step: 4, default: 32 },
+		{ key: 'blackThreshold', label: 'Black threshold', min: 0, max: 100, step: 1, default: 20 },
+		{ key: 'whiteThreshold', label: 'White threshold', min: 150, max: 255, step: 1, default: 235 },
+		{ key: 'majorBlobFeather', label: 'Major blob feather', min: 20, max: 100, step: 1, default: 66 },
+		{ key: 'edgeBleed', label: 'Edge bleed', min: 0, max: 50, step: 1, default: 22 },
+		{ key: 'sideBloomCount', label: 'Side bloom count', min: 0, max: 6, step: 1, default: 2 },
+		{ key: 'sideBloomOpacity', label: 'Side bloom opacity', min: 0, max: 1, step: 0.01, default: 0.32 },
+		{ key: 'sideBloomRadius', label: 'Side bloom radius', min: 10, max: 80, step: 1, default: 42 },
+	]
+
+	const ADVANCED_BOOLS: BoolSpec[] = [
+		{ key: 'skipTransparent', label: 'Skip transparent pixels', default: true },
+		{ key: 'skipBlack', label: 'Skip near-black pixels', default: true },
+		{ key: 'skipWhite', label: 'Skip near-white pixels', default: true },
+	]
+
+	function buildSliderRow(spec: SliderSpec): HTMLElement {
+		const row = document.createElement('label')
+		row.className = 'grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 sm:flex sm:items-center'
+		const pct = spec.max > spec.min ? ((spec.default - spec.min) / (spec.max - spec.min)) * 100 : 50
+		row.innerHTML = `
+			<span class="opacity-80 sm:w-32 sm:shrink-0">${spec.label}</span>
+			<output class="text-right tabular-nums opacity-70 sm:order-last sm:w-14">${spec.default}</output>
+			<input class="demo-slider col-span-2 min-w-0 sm:col-span-1 sm:flex-1" style="--demo-slider-pct: ${pct}%" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step}" value="${spec.default}" data-key="${spec.key}" />
+		`
+		return row
+	}
+
+	function buildBoolRow(spec: BoolSpec): HTMLElement {
+		const row = document.createElement('label')
+		row.className = 'flex items-center gap-3'
+		row.innerHTML = `
+			<span class="w-32 shrink-0 opacity-80">${spec.label}</span>
+			<input type="checkbox" data-key="${spec.key}" ${spec.default ? 'checked' : ''} />
+		`
+		return row
+	}
+
+	document.addEventListener('astro:page-load', () => {
+		const roots = document.querySelectorAll<HTMLElement>('.ambient-glow-sandbox')
+		if (roots.length === 0) return
+
+		const cleanups: Array<() => void> = []
+
+		roots.forEach(root => {
+			const img = root.querySelector<HTMLImageElement>('.ambient-glow-sandbox-img')!
+			const upload = root.querySelector<HTMLInputElement>('.ambient-glow-sandbox-upload')!
+			const curatedHost = root.querySelector<HTMLElement>('.ambient-glow-sandbox-controls')!
+			const advancedHost = root.querySelector<HTMLElement>('.ambient-glow-sandbox-advanced')!
+			const advancedToggle = root.querySelector<HTMLButtonElement>('.ambient-glow-sandbox-toggle-advanced')!
+
+			CURATED.forEach(spec => curatedHost.appendChild(buildSliderRow(spec)))
+			ADVANCED_SLIDERS.forEach(spec => advancedHost.appendChild(buildSliderRow(spec)))
+			ADVANCED_BOOLS.forEach(spec => advancedHost.appendChild(buildBoolRow(spec)))
+
+			const glow = mount(img)
+
+			const controller = new AbortController()
+			const { signal } = controller
+
+			const FADE_OVERRIDE_MS = 60
+			let userFadeMs = ADVANCED_SLIDERS.find(s => s.key === 'fadeMs')?.default ?? 1000
+
+			let pendingPatch: Partial<GlowOptions> = {}
+			const pendingDisplays = new Map<HTMLElement, string>()
+			let pendingFrame: number | null = null
+
+			const flush = () => {
+				pendingFrame = null
+				pendingDisplays.forEach((text, el) => {
+					el.textContent = text
+				})
+				pendingDisplays.clear()
+				if (Object.keys(pendingPatch).length > 0) {
+					glow.setOptions(pendingPatch)
+					pendingPatch = {}
+				}
+			}
+
+			const schedule = () => {
+				if (pendingFrame !== null) return
+				pendingFrame = requestAnimationFrame(flush)
+			}
+
+			root.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(input => {
+				const output = input.parentElement?.querySelector('output') as HTMLElement | null
+				const key = input.dataset.key as ControlKey
+				input.addEventListener(
+					'input',
+					() => {
+						const value = parseFloat(input.value)
+						if (output) pendingDisplays.set(output, Number.isInteger(value) ? `${value}` : value.toFixed(2))
+						const patch = pendingPatch as Record<string, number | boolean>
+						patch[key] = value
+						if (key === 'fadeMs') {
+							userFadeMs = value
+						} else {
+							patch.fadeMs = FADE_OVERRIDE_MS
+						}
+						schedule()
+					},
+					{ signal },
+				)
+				input.addEventListener(
+					'change',
+					() => {
+						if (key === 'fadeMs') return
+						;(pendingPatch as Record<string, number | boolean>).fadeMs = userFadeMs
+						schedule()
+					},
+					{ signal },
+				)
+			})
+
+			root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(input => {
+				input.addEventListener(
+					'change',
+					() => {
+						;(pendingPatch as Record<string, number | boolean>)[input.dataset.key as ControlKey] = input.checked
+						schedule()
+					},
+					{ signal },
+				)
+			})
+
+			advancedToggle.addEventListener(
+				'click',
+				() => {
+					const hidden = advancedHost.classList.toggle('hidden')
+					advancedToggle.setAttribute('aria-expanded', String(!hidden))
+					advancedToggle.textContent = hidden ? 'Show advanced options' : 'Hide advanced options'
+				},
+				{ signal },
+			)
+
+			let lastObjectUrl: string | null = null
+			upload.addEventListener(
+				'change',
+				() => {
+					const file = upload.files?.[0]
+					if (!file) return
+					if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl)
+					lastObjectUrl = URL.createObjectURL(file)
+					img.removeAttribute('crossorigin')
+					img.src = lastObjectUrl
+				},
+				{ signal },
+			)
+
+			cleanups.push(() => {
+				controller.abort()
+				if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
+				glow.destroy()
+				if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl)
+			})
+		})
+
+		document.addEventListener(
+			'astro:before-preparation',
+			() => {
+				cleanups.forEach(fn => fn())
+			},
+			{ once: true },
+		)
+	})
+</script>

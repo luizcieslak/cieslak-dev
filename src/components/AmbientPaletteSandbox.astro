@@ -1,0 +1,142 @@
+---
+interface Props {
+	defaultImage?: string
+	defaultAlt?: string
+}
+
+const { defaultImage = '/lofi/lofi.png', defaultAlt = 'Color palette extraction preview' } = Astro.props
+---
+
+<figure class='ambient-palette-sandbox not-prose my-10 rounded-lg border border-main bg-muted/30 p-4'>
+	<div class='grid gap-5 sm:grid-cols-[1fr,1fr] sm:items-center'>
+		<img
+			class='ambient-palette-sandbox-img block aspect-square w-full rounded-md object-cover shadow-md'
+			src={defaultImage}
+			alt={defaultAlt}
+			crossorigin='anonymous'
+		/>
+		<div class='ambient-palette-sandbox-grid grid aspect-square w-full overflow-hidden rounded-md'>
+			<!-- swatches injected by <script> below -->
+		</div>
+	</div>
+
+	<div class='mt-5 grid gap-3 text-sm'>
+		<label class='grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 sm:flex sm:items-center'>
+			<span class='opacity-80 sm:w-32 sm:shrink-0'>Grid size</span>
+			<output
+				class='ambient-palette-sandbox-grid-size-out text-right tabular-nums opacity-70 sm:order-last sm:w-14'
+				>4×4</output
+			>
+			<input
+				class='ambient-palette-sandbox-grid-size demo-slider col-span-2 min-w-0 sm:col-span-1 sm:flex-1'
+				style='--demo-slider-pct: 3.45%'
+				type='range'
+				min='2'
+				max='28'
+				step='1'
+				value='4'
+			/>
+		</label>
+		<label class='grid gap-y-1.5 sm:flex sm:items-center sm:gap-3'>
+			<span class='opacity-80 sm:w-32 sm:shrink-0'>Upload image</span>
+			<input class='ambient-palette-sandbox-upload min-w-0 sm:flex-1' type='file' accept='image/*' />
+		</label>
+	</div>
+</figure>
+
+<script>
+	import { extractColors, type Rgb } from '../lib/ambient-glow'
+
+	function rgbToHex({ r, g, b }: Rgb): string {
+		const h = (n: number) => n.toString(16).padStart(2, '0')
+		return `#${h(r)}${h(g)}${h(b)}`
+	}
+
+	function render(host: HTMLElement, colors: Array<Rgb | null>, gridSize: number) {
+		host.style.gridTemplateColumns = `repeat(${gridSize}, minmax(0, 1fr))`
+		host.style.gridTemplateRows = `repeat(${gridSize}, minmax(0, 1fr))`
+		const showLabel = gridSize <= 6
+		const fragment = document.createDocumentFragment()
+		colors.forEach(color => {
+			const cell = document.createElement('div')
+			cell.className = 'relative flex items-end justify-center'
+			if (color) {
+				const hex = rgbToHex(color)
+				cell.style.background = hex
+				cell.innerHTML = showLabel
+					? `<span class="m-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-mono leading-none text-white">${hex}</span>`
+					: ''
+			} else {
+				cell.style.background = 'transparent'
+				cell.innerHTML = showLabel ? '<span class="m-1 text-[10px] opacity-50">—</span>' : ''
+			}
+			fragment.appendChild(cell)
+		})
+		host.replaceChildren(fragment)
+	}
+
+	document.addEventListener('astro:page-load', () => {
+		const roots = document.querySelectorAll<HTMLElement>('.ambient-palette-sandbox')
+		if (roots.length === 0) return
+
+		const cleanups: Array<() => void> = []
+
+		roots.forEach(root => {
+			const img = root.querySelector<HTMLImageElement>('.ambient-palette-sandbox-img')!
+			const host = root.querySelector<HTMLElement>('.ambient-palette-sandbox-grid')!
+			const upload = root.querySelector<HTMLInputElement>('.ambient-palette-sandbox-upload')!
+			const gridSizeInput = root.querySelector<HTMLInputElement>('.ambient-palette-sandbox-grid-size')!
+			const gridSizeOut = root.querySelector<HTMLElement>('.ambient-palette-sandbox-grid-size-out')!
+
+			let pendingFrame: number | null = null
+
+			const update = () => {
+				pendingFrame = null
+				const gridSize = parseInt(gridSizeInput.value, 10)
+				gridSizeOut.textContent = `${gridSize}×${gridSize}`
+				const colors = extractColors(img, { gridSize })
+				render(host, colors, gridSize)
+			}
+
+			const scheduleUpdate = () => {
+				if (pendingFrame !== null) return
+				pendingFrame = requestAnimationFrame(update)
+			}
+
+			const controller = new AbortController()
+			const { signal } = controller
+
+			img.addEventListener('load', scheduleUpdate, { signal })
+			gridSizeInput.addEventListener('input', scheduleUpdate, { signal })
+			if (img.complete && img.naturalWidth) scheduleUpdate()
+
+			let lastObjectUrl: string | null = null
+			upload.addEventListener(
+				'change',
+				() => {
+					const file = upload.files?.[0]
+					if (!file) return
+					if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl)
+					lastObjectUrl = URL.createObjectURL(file)
+					img.removeAttribute('crossorigin')
+					img.src = lastObjectUrl
+				},
+				{ signal },
+			)
+
+			cleanups.push(() => {
+				controller.abort()
+				if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
+				if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl)
+			})
+		})
+
+		document.addEventListener(
+			'astro:before-preparation',
+			() => {
+				cleanups.forEach(fn => fn())
+			},
+			{ once: true },
+		)
+	})
+</script>

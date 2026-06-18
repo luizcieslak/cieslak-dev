@@ -1,0 +1,303 @@
+---
+type Lang = 'en' | 'pt-br'
+
+interface Props {
+	lang?: Lang
+}
+
+const { lang = 'en' } = Astro.props
+
+const strings = {
+	en: {
+		stall: 'stall',
+		stalls: 'stalls',
+		seconds: 's buffered',
+		lanes: [
+			{ kind: 'naive', label: 'no buffer', sub: 'live edge' },
+			{ kind: 'burst', label: 'burst-on-connect', sub: '~4 s buffered' },
+		],
+	},
+	'pt-br': {
+		stall: 'travou',
+		stalls: 'travamentos',
+		seconds: 's no buffer',
+		lanes: [
+			{ kind: 'naive', label: 'sem buffer', sub: 'borda ao vivo' },
+			{ kind: 'burst', label: 'burst ao conectar', sub: '~4 s no buffer' },
+		],
+	},
+}[lang]
+---
+
+<figure
+	class='buffer-cushion-demo not-prose my-10 rounded-lg border border-main bg-muted/30 p-4 sm:p-6'
+	data-stall-label={strings.stall}
+	data-stalls-word={strings.stalls}
+	data-seconds-word={strings.seconds}
+>
+	<figcaption class='mb-5 text-sm leading-relaxed opacity-80'>
+		{
+			lang === 'en' ? (
+				<>
+					A real-time stream would hand out audio just fast enough to play it, <em>never</em> faster. The same
+					jittery network feeds both bars below, the only difference is how much is buffered ahead. With
+					almost nothing buffered, every hiccup drains it to empty and you hear a gap. A few seconds of
+					cushion absorbs the same hiccups.
+				</>
+			) : (
+				<>
+					Uma stream em tempo real entregaria o áudio rápido o suficiente para tocá-lo,<em>nunca</em> mais
+					rápido. A mesma rede de internet instável alimenta as duas barras, a diferença é quanto buffer tem
+					na frente. Com quase nada no buffer, cada travada esvazia e vc a música dá uma travada. Alguns
+					segundos de buffer absorvem esses engasgos.
+				</>
+			)
+		}
+	</figcaption>
+
+	<div
+		class='buffer-cushion-lanes grid items-center gap-x-3 gap-y-2.5'
+		style='grid-template-columns: max-content 1fr;'
+	>
+		{
+			strings.lanes.map(lane => (
+				<Fragment>
+					<div class='text-right leading-tight'>
+						<div class='bcd-label font-mono text-xs sm:text-sm'>{lane.label}</div>
+						<div class='text-[10px] uppercase tracking-wide opacity-80'>{lane.sub}</div>
+					</div>
+					<div
+						class='bcd-track relative h-9 overflow-hidden rounded-md bg-black/[0.03] ring-1 ring-inset ring-black/5 dark:bg-white/[0.04] dark:ring-white/10 sm:h-10'
+						data-lane={lane.kind}
+					/>
+				</Fragment>
+			))
+		}
+	</div>
+
+	<p class='bcd-readout mt-4 font-mono text-xs tabular-nums opacity-80 sm:text-sm'></p>
+
+	<p class='mt-3 text-xs leading-relaxed opacity-80'>
+		{
+			lang === 'en' ? (
+				<>
+					A live stream sends exactly one frame per frame-duration — it never sends faster, so a fresh
+					listener's buffer starts at zero and stays razor-thin. One late packet and it underruns. Replaying
+					the last few seconds of frames the instant they connect gives the decoder something to coast on. The
+					cost: that listener is now a few seconds behind the live edge — "perfect sync" becomes "perfect sync
+					within the burst window."
+				</>
+			) : (
+				<>
+					Uma stream ao vivo envia exatamente um frame por duração de frame — nunca mais rápido, então o
+					buffer de um ouvinte novo começa em zero e fica raso demais. Um pacote atrasado e ele esvazia.
+					Reproduzir os últimos segundos de frames no instante em que ele conecta dá ao decoder uma folga para
+					deslizar. O custo: esse ouvinte fica alguns segundos atrás da borda ao vivo — a "sincronia perfeita"
+					vira "sincronia perfeita dentro da janela do burst".
+				</>
+			)
+		}
+	</p>
+</figure>
+
+<script>
+	const MAX_BUFFER = 5 // seconds the gauge represents (and the buffer cap)
+	const START_NAIVE = 0.4 // a fresh listener joins at the live edge, almost nothing buffered
+	const START_BURST = 4 // burst-on-connect replays ~4s of recent frames immediately
+	const CYCLE_MS = 11500
+	const HOLD_MS = 1200
+
+	// Scripted network: baseline delivers exactly 1x (matches playback, so buffers hold
+	// flat). Each hiccup drops delivery to 0 for `down` seconds, then catches up at 2x for
+	// `up` seconds — net-zero per hiccup, so the sim loops cleanly. Both lanes see the same
+	// curve; only the starting buffer differs.
+	const HICCUPS = [
+		{ start: 1.5, down: 1.2, up: 1.2 },
+		{ start: 5.0, down: 1.2, up: 1.2 },
+		{ start: 8.5, down: 1.2, up: 1.0 },
+	]
+
+	const COLOR_HEALTHY = 'rgba(16, 185, 129, 0.8)' // emerald-500
+	const COLOR_LOW = 'rgba(245, 158, 11, 0.85)' // amber-500
+
+	function netRate(elapsedMs: number): number {
+		const t = elapsedMs / 1000
+		for (const h of HICCUPS) {
+			if (t >= h.start && t < h.start + h.down) return 0
+			if (t >= h.start + h.down && t < h.start + h.down + h.up) return 2
+		}
+		return 1
+	}
+
+	interface Lane {
+		kind: string
+		startBuf: number
+		buf: number
+		playing: boolean
+		stalls: number
+		name: string
+		fill: HTMLElement
+		badge: HTMLElement
+		flash: HTMLElement
+	}
+
+	function el(cls: string): HTMLElement {
+		const d = document.createElement('div')
+		d.className = cls
+		return d
+	}
+
+	function buildLane(track: HTMLElement, labelCell: HTMLElement, stallLabel: string): Lane {
+		const kind = track.dataset.lane ?? 'naive'
+
+		// faint 1-second gridlines so the cushion depth is readable
+		for (let i = 1; i < MAX_BUFFER; i++) {
+			const tick = el('absolute inset-y-0 w-px bg-black/10 dark:bg-white/10')
+			tick.style.left = `${(i / MAX_BUFFER) * 100}%`
+			track.appendChild(tick)
+		}
+
+		const flash = el('absolute inset-0 rounded-md bg-red-500/20 opacity-0 transition-opacity duration-150')
+		const fill = el('absolute inset-y-1 left-0 rounded-sm transition-colors duration-200')
+		const badge = el(
+			'absolute right-2 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide bg-red-500 text-white opacity-0 transition-opacity duration-150',
+		)
+		badge.textContent = stallLabel
+		track.append(flash, fill, badge)
+
+		const name = labelCell.querySelector('.bcd-label')?.textContent ?? kind
+		const startBuf = kind === 'burst' ? START_BURST : START_NAIVE
+
+		return { kind, startBuf, buf: startBuf, playing: true, stalls: 0, name, fill, badge, flash }
+	}
+
+	function stepLane(lane: Lane, arrival: number, dtV: number) {
+		const avail = lane.buf + arrival
+		if (avail >= dtV) {
+			lane.buf = Math.min(avail - dtV, MAX_BUFFER)
+			lane.playing = true
+		} else {
+			// underrun: nothing left to play this frame
+			lane.buf = 0
+			if (lane.playing) lane.stalls++
+			lane.playing = false
+		}
+	}
+
+	function initDemo(root: HTMLElement): () => void {
+		const stallLabel = root.dataset.stallLabel ?? 'stall'
+		const stallsWord = root.dataset.stallsWord ?? 'stalls'
+		const secondsWord = root.dataset.secondsWord ?? 's buffered'
+		const readoutEl = root.querySelector<HTMLElement>('.bcd-readout')!
+
+		const tracks = Array.from(root.querySelectorAll<HTMLElement>('.bcd-track'))
+		const labels = Array.from(
+			root.querySelectorAll<HTMLElement>('.buffer-cushion-lanes > div:not(.bcd-track)'),
+		)
+		const lanes = tracks.map((track, i) => buildLane(track, labels[i], stallLabel))
+
+		function render() {
+			for (const lane of lanes) {
+				const stalled = !lane.playing
+				lane.fill.style.width = `${(lane.buf / MAX_BUFFER) * 100}%`
+				lane.fill.style.backgroundColor = lane.buf < 1.2 ? COLOR_LOW : COLOR_HEALTHY
+				lane.flash.style.opacity = stalled ? '1' : '0'
+				lane.badge.style.opacity = stalled ? '1' : '0'
+			}
+			readoutEl.textContent = lanes
+				.map(l => `${l.name} — ${l.buf.toFixed(1)} ${secondsWord} · ${l.stalls} ${stallsWord}`)
+				.join('     |     ')
+		}
+
+		function resetSim() {
+			for (const lane of lanes) {
+				lane.buf = lane.startBuf
+				lane.playing = true
+				lane.stalls = 0
+			}
+		}
+
+		function advance(dtV: number, elapsedMs: number) {
+			const arrival = netRate(elapsedMs) * dtV
+			for (const lane of lanes) stepLane(lane, arrival, dtV)
+		}
+
+		if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+			// fast-forward to a moment mid-hiccup: naive stalled, burst comfortable
+			resetSim()
+			for (let ms = 0; ms < 2100; ms += 16) advance(16 / 1000, ms)
+			render()
+			return () => {}
+		}
+
+		let cycleStart = 0
+		let holdUntil = 0
+		let phase: 'play' | 'hold' = 'play'
+		let last = 0
+		let raf = 0
+		let running = false
+
+		function loop(now: number) {
+			const dtV = Math.min(now - last, 50) / 1000
+			last = now
+
+			if (phase === 'play') {
+				const elapsed = now - cycleStart
+				if (elapsed >= CYCLE_MS) {
+					phase = 'hold'
+					holdUntil = now + HOLD_MS
+				} else {
+					advance(dtV, elapsed)
+				}
+				render()
+			} else if (now >= holdUntil) {
+				resetSim()
+				cycleStart = now
+				phase = 'play'
+				render()
+			}
+			raf = requestAnimationFrame(loop)
+		}
+
+		function start() {
+			if (running) return
+			running = true
+			resetSim()
+			last = performance.now()
+			cycleStart = last
+			phase = 'play'
+			render()
+			raf = requestAnimationFrame(loop)
+		}
+
+		function stop() {
+			running = false
+			cancelAnimationFrame(raf)
+		}
+
+		const io = new IntersectionObserver(
+			entries => {
+				for (const e of entries) {
+					if (e.isIntersecting) start()
+					else stop()
+				}
+			},
+			{ threshold: 0.2 },
+		)
+		io.observe(root)
+
+		return () => {
+			stop()
+			io.disconnect()
+		}
+	}
+
+	document.addEventListener('astro:page-load', () => {
+		const roots = document.querySelectorAll<HTMLElement>('.buffer-cushion-demo')
+		if (roots.length === 0) return
+
+		const cleanups = Array.from(roots, initDemo)
+
+		document.addEventListener('astro:before-preparation', () => cleanups.forEach(fn => fn()), { once: true })
+	})
+</script>

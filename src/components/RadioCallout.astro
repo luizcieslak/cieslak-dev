@@ -4,29 +4,21 @@ import { getLangFromUrl, useTranslations } from '../i18n/utils'
 const lang = getLangFromUrl(Astro.url)
 const t = useTranslations(lang)
 
-const headingByLang: Record<string, string> = {
-	en: 'Listen along while you read',
-	'pt-br': 'Ouça enquanto você lê',
-}
-const bodyByLang: Record<string, string> = {
-	en: 'A small lofi stream I run on a side server. Hit play and a miniplayer follows you around the site.',
-	'pt-br':
-		'Uma pequena rádio lofi que eu mantenho em um servidor secundário. Aperte play e um miniplayer te acompanha pelo site.',
-}
-
-const heading = headingByLang[lang] || headingByLang.en
-const body = bodyByLang[lang] || bodyByLang.en
 const labelPlay = t('radio.play')
 const labelPause = t('radio.pause')
+const labelOpen = t('radio.title')
 ---
 
 <aside
-	class='radio-callout my-10 flex items-center gap-4 rounded-lg border border-main/20 bg-muted/40 px-5 py-4 not-prose'
+	class='radio-callout relative my-10 mx-auto flex max-w-[280px] items-center rounded-lg border border-main bg-muted/40 px-4 py-2 not-prose'
 	data-label-play={labelPlay}
 	data-label-pause={labelPause}
 >
+	<span class='radio-callout-glow-anchor pointer-events-none' aria-hidden='true'>
+		<img class='radio-callout-glow-source' src='' alt='' crossorigin='anonymous' />
+	</span>
 	<button
-		class='radio-callout-toggle inline-flex h-12 w-12 flex-none items-center justify-center rounded-full border border-main bg-main/95 text-main shadow-sm transition hover:bg-muted'
+		class='radio-callout-toggle relative z-[2] inline-flex h-12 w-12 flex-none items-center justify-center rounded-full border border-main bg-main/95 text-main shadow-sm transition hover:bg-muted'
 		type='button'
 		aria-label={labelPlay}
 	>
@@ -51,25 +43,100 @@ const labelPause = t('radio.pause')
 			<path d='M6 5h4v14H6zM14 5h4v14h-4z'></path>
 		</svg>
 	</button>
-	<div class='min-w-0 flex-1'>
-		<p class='font-medium leading-tight'>{heading}</p>
-		<p class='mt-1 text-sm leading-snug opacity-75'>{body}</p>
-		<p class='radio-callout-now-playing mt-2 hidden truncate text-sm leading-snug opacity-85'>
-			<span class='radio-callout-track-title'></span>
-			<span class='opacity-70'> — </span>
-			<span class='radio-callout-track-artist'></span>
-		</p>
-	</div>
+	<span class='radio-callout-label radio-nav-badge whitespace-nowrap !border-0 px-8 text-base'
+		>lofi radio</span
+	>
+	<a
+		class='radio-callout-now-playing relative z-[1] flex min-w-0 items-center gap-3 hover:opacity-80'
+		href={`/${lang}/radio/`}
+		aria-label={labelOpen}
+	>
+		<span class='radio-callout-cover-frame relative flex-none h-12 w-12'>
+			<img
+				class='radio-callout-track-cover relative z-[1] block h-full w-full rounded bg-muted object-cover'
+				src=''
+				alt=''
+				crossorigin='anonymous'
+			/>
+		</span>
+		<div class='min-w-0 flex-1'>
+			<p class='radio-callout-track-title truncate text-sm font-medium leading-tight'></p>
+			<p class='radio-callout-track-artist truncate text-xs leading-tight opacity-70'></p>
+		</div>
+	</a>
 </aside>
+
+<style is:inline>
+	.radio-callout-label {
+		max-width: 200px;
+		overflow: hidden;
+		transition:
+			max-width 500ms cubic-bezier(0.4, 0, 0.2, 1),
+			padding 500ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.radio-callout[data-has-track='true'] .radio-callout-label {
+		max-width: 0;
+		padding: 0;
+		opacity: 0;
+	}
+	.radio-callout-now-playing {
+		max-width: 0;
+		opacity: 0;
+		padding-left: 0;
+		overflow: hidden;
+		transition:
+			max-width 500ms cubic-bezier(0.4, 0, 0.2, 1),
+			opacity 350ms ease,
+			padding-left 500ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.radio-callout[data-has-track='true'] .radio-callout-now-playing {
+		max-width: 280px;
+		opacity: 1;
+		padding-left: 1rem;
+	}
+
+	/* Phantom anchor positioned over where the album cover renders.
+	   Sits outside the overflow-hidden now-playing block so the glow
+	   layers can extend far beyond the callout boundary. */
+	.radio-callout-glow-anchor {
+		position: absolute;
+		top: 50%;
+		left: calc(0.75rem + 3rem + 0.75rem); /* aside padding + button + gap */
+		width: 3rem;
+		height: 3rem;
+		transform: translateY(-50%);
+		z-index: 0;
+		opacity: 0;
+		transition: opacity 600ms ease;
+	}
+	.radio-callout[data-has-track='true'] .radio-callout-glow-anchor {
+		opacity: 1;
+	}
+	.radio-callout-glow-source {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		visibility: hidden;
+	}
+</style>
 
 <script>
 	import { getRadioPlayer } from '../lib/radio-player'
+	import { mount } from '../lib/ambient-glow'
 
 	const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
 
 	document.addEventListener('astro:page-load', () => {
 		const callouts = document.querySelectorAll<HTMLElement>('.radio-callout')
 		if (callouts.length === 0) return
+
+		const lang = location.pathname.split('/')[1] === 'pt-br' ? 'pt-br' : 'en'
+		callouts.forEach(callout => {
+			callout
+				.querySelector<HTMLAnchorElement>('.radio-callout-now-playing')
+				?.setAttribute('href', `/${lang}/radio/`)
+		})
 
 		const audio = document.getElementById('radio-audio') as HTMLAudioElement | null
 		if (!audio) return
@@ -110,9 +177,26 @@ const labelPause = t('radio.pause')
 			const toggleBtn = callout.querySelector<HTMLButtonElement>('.radio-callout-toggle')!
 			const iconPlay = callout.querySelector<SVGElement>('.radio-callout-icon-play')!
 			const iconPause = callout.querySelector<SVGElement>('.radio-callout-icon-pause')!
-			const nowPlaying = callout.querySelector<HTMLElement>('.radio-callout-now-playing')!
 			const titleEl = callout.querySelector<HTMLElement>('.radio-callout-track-title')!
 			const artistEl = callout.querySelector<HTMLElement>('.radio-callout-track-artist')!
+			const coverEl = callout.querySelector<HTMLImageElement>('.radio-callout-track-cover')!
+			const glowSourceEl = callout.querySelector<HTMLImageElement>('.radio-callout-glow-source')!
+
+			const glow = mount(glowSourceEl, {
+				blur: 14,
+				sizeMultiplier: 4,
+				verticalStretch: 1.6,
+				majorBlobCount: 8,
+				majorBlobOpacity: 0.68,
+				majorBlobRadius: 28,
+				majorBlobFeather: 32,
+				jitter: 4,
+				edgeBleed: 2,
+				horizontalStretch: 1,
+				sideBloomCount: 1,
+				sideBloomOpacity: 0.3,
+				sideBloomRadius: 18,
+			})
 
 			const controller = new AbortController()
 			const { signal } = controller
@@ -129,9 +213,17 @@ const labelPause = t('radio.pause')
 				if (playing && track) {
 					titleEl.textContent = track.title || ''
 					artistEl.textContent = track.artist || ''
-					nowPlaying.classList.remove('hidden')
+					const cover = track.albumArtUrl || track.coverUrl || ''
+					if (cover && coverEl.src !== cover) {
+						coverEl.src = cover
+						coverEl.alt = track.title || ''
+					}
+					if (cover && glowSourceEl.src !== cover) {
+						glowSourceEl.src = cover
+					}
+					callout.dataset.hasTrack = 'true'
 				} else {
-					nowPlaying.classList.add('hidden')
+					callout.dataset.hasTrack = 'false'
 				}
 			})
 
@@ -140,6 +232,7 @@ const labelPause = t('radio.pause')
 				() => {
 					unsubscribe()
 					controller.abort()
+					glow.destroy()
 				},
 				{ once: true },
 			)

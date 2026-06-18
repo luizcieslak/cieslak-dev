@@ -36,6 +36,16 @@ export interface GlowHandle {
 	destroy(): void
 }
 
+const EXTRACTION_KEYS: ReadonlyArray<keyof GlowOptions> = [
+	'gridSize',
+	'binSize',
+	'skipTransparent',
+	'skipBlack',
+	'blackThreshold',
+	'skipWhite',
+	'whiteThreshold',
+]
+
 const DEFAULTS: Required<GlowOptions> = {
 	gridSize: 4,
 	blur: 40,
@@ -60,6 +70,14 @@ const DEFAULTS: Required<GlowOptions> = {
 	sideBloomRadius: 42,
 }
 
+export function extractColors(img: HTMLImageElement, userOptions: GlowOptions = {}): Array<Rgb | null> {
+	if (!img.naturalWidth) return []
+	const opts: Required<GlowOptions> = { ...DEFAULTS, ...userOptions }
+	const canvas = document.createElement('canvas')
+	const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+	return extractImageColors(img, opts, canvas, ctx)
+}
+
 export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): GlowHandle {
 	const parent = img.parentElement
 	if (!parent) throw new Error('ambient-glow: img must be attached to the DOM before mount()')
@@ -67,6 +85,7 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 	let options: Required<GlowOptions> = { ...DEFAULTS, ...userOptions }
 	let lastColors: Array<Rgb | null> = []
 	let activeKey: 'a' | 'b' = 'a'
+	let hasApplied = false
 
 	const layerA = createLayer(options)
 	const layerB = createLayer(options)
@@ -76,21 +95,29 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 	const canvas = document.createElement('canvas')
 	const ctx = canvas.getContext('2d', { willReadFrequently: true })!
 
-	const onLoad = () => extract()
+	let pendingFrame: number | null = null
+	let pendingExtract = false
+
+	const onLoad = () => schedule(true)
 	img.addEventListener('load', onLoad)
-	if (img.complete && img.naturalWidth) extract()
+	if (img.complete && img.naturalWidth) schedule(true)
+
+	function schedule(needsExtract: boolean) {
+		if (needsExtract) pendingExtract = true
+		if (pendingFrame !== null) return
+		pendingFrame = requestAnimationFrame(() => {
+			pendingFrame = null
+			const doExtract = pendingExtract
+			pendingExtract = false
+			if (doExtract) extract()
+			else apply(lastColors)
+		})
+	}
 
 	function extract() {
 		if (!img.naturalWidth) return
-		canvas.width = img.naturalWidth
-		canvas.height = img.naturalHeight
-		try {
-			ctx.drawImage(img, 0, 0)
-		} catch {
-			// CORS-tainted canvas; consumer must set crossorigin + server CORS headers
-			return
-		}
-		lastColors = extractGridColors(ctx, options)
+		lastColors = extractImageColors(img, options, canvas, ctx)
+		if (lastColors.length === 0) return
 		apply(lastColors)
 	}
 
@@ -99,10 +126,12 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		const next = activeKey === 'a' ? layerB : layerA
 		const prev = activeKey === 'a' ? layerA : layerB
 		next.style.background = gradient
-		// Force a reflow so the browser commits the layer's starting opacity
-		// before we change it — otherwise the first apply (just after mount)
-		// snaps to 0.8 without animating.
-		void next.offsetHeight
+		// Only force the first reflow. Doing it for every slider tick makes the
+		// interactive sandboxes stutter on lower-power/mobile browsers.
+		if (!hasApplied) {
+			void next.offsetHeight
+			hasApplied = true
+		}
 		next.style.opacity = '0.8'
 		prev.style.opacity = '0'
 		activeKey = activeKey === 'a' ? 'b' : 'a'
@@ -113,16 +142,18 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 			options = { ...options, ...patch }
 			styleLayer(layerA, options)
 			styleLayer(layerB, options)
-			extract()
+			const needsExtract = Object.keys(patch).some(k => EXTRACTION_KEYS.includes(k as keyof GlowOptions))
+			schedule(needsExtract)
 		},
 		update() {
-			extract()
+			schedule(true)
 		},
 		getColors() {
 			return [...lastColors]
 		},
 		destroy() {
 			img.removeEventListener('load', onLoad)
+			if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
 			layerA.remove()
 			layerB.remove()
 		},
@@ -151,35 +182,69 @@ function styleLayer(el: HTMLDivElement, opts: Required<GlowOptions>) {
 	if (s.opacity === '') s.opacity = '0'
 }
 
-function extractGridColors(ctx: CanvasRenderingContext2D, opts: Required<GlowOptions>): Array<Rgb | null> {
+function extractImageColors(
+	img: HTMLImageElement,
+	opts: Required<GlowOptions>,
+	canvas: HTMLCanvasElement,
+	ctx: CanvasRenderingContext2D,
+): Array<Rgb | null> {
+	const maxSide = Math.max(96, Math.min(360, opts.gridSize * 8))
+	const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight))
+	canvas.width = Math.max(opts.gridSize, Math.round(img.naturalWidth * scale))
+	canvas.height = Math.max(opts.gridSize, Math.round(img.naturalHeight * scale))
+	ctx.clearRect(0, 0, canvas.width, canvas.height)
+	try {
+		ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+	} catch {
+		// CORS-tainted canvas; consumer must set crossorigin + server CORS headers
+		return []
+	}
+	return extractGridColors(ctx.getImageData(0, 0, canvas.width, canvas.height), opts)
+}
+
+function extractGridColors(imageData: ImageData, opts: Required<GlowOptions>): Array<Rgb | null> {
 	const { gridSize } = opts
-	const cellW = Math.floor(ctx.canvas.width / gridSize)
-	const cellH = Math.floor(ctx.canvas.height / gridSize)
+	const cellW = Math.max(1, Math.floor(imageData.width / gridSize))
+	const cellH = Math.max(1, Math.floor(imageData.height / gridSize))
 	const out: Array<Rgb | null> = []
 	for (let row = 0; row < gridSize; row++) {
 		for (let col = 0; col < gridSize; col++) {
-			const data = ctx.getImageData(col * cellW, row * cellH, cellW, cellH)
-			out.push(dominantColor(data, opts))
+			const x0 = col * cellW
+			const y0 = row * cellH
+			const x1 = col === gridSize - 1 ? imageData.width : x0 + cellW
+			const y1 = row === gridSize - 1 ? imageData.height : y0 + cellH
+			out.push(dominantColor(imageData, x0, y0, x1, y1, opts))
 		}
 	}
 	return out
 }
 
-function dominantColor(imageData: ImageData, opts: Required<GlowOptions>): Rgb | null {
+function dominantColor(
+	imageData: ImageData,
+	x0: number,
+	y0: number,
+	x1: number,
+	y1: number,
+	opts: Required<GlowOptions>,
+): Rgb | null {
 	const { binSize, skipTransparent, skipBlack, blackThreshold, skipWhite, whiteThreshold } = opts
-	const d = imageData.data
+	const { data, width } = imageData
 	const counts = new Map<string, number>()
-	for (let i = 0; i < d.length; i += 4) {
-		const r = d[i]
-		const g = d[i + 1]
-		const b = d[i + 2]
-		const a = d[i + 3]
-		if (skipTransparent && a < 128) continue
-		const lum = 0.299 * r + 0.587 * g + 0.114 * b
-		if (skipBlack && lum < blackThreshold) continue
-		if (skipWhite && lum > whiteThreshold) continue
-		const key = `${Math.floor(r / binSize)},${Math.floor(g / binSize)},${Math.floor(b / binSize)}`
-		counts.set(key, (counts.get(key) || 0) + 1)
+	for (let y = y0; y < y1; y++) {
+		let i = (y * width + x0) * 4
+		const end = (y * width + x1) * 4
+		for (; i < end; i += 4) {
+			const r = data[i]
+			const g = data[i + 1]
+			const b = data[i + 2]
+			const a = data[i + 3]
+			if (skipTransparent && a < 128) continue
+			const lum = 0.299 * r + 0.587 * g + 0.114 * b
+			if (skipBlack && lum < blackThreshold) continue
+			if (skipWhite && lum > whiteThreshold) continue
+			const key = `${Math.floor(r / binSize)},${Math.floor(g / binSize)},${Math.floor(b / binSize)}`
+			counts.set(key, (counts.get(key) || 0) + 1)
+		}
 	}
 	let bestKey: string | null = null
 	let bestCount = 0
@@ -201,7 +266,8 @@ function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): 
 			const { row, col } = getGridPosition(index, opts.gridSize)
 			const centeredX = ((col + 0.5) / opts.gridSize - 0.5) * 2
 			const centeredY = ((row + 0.5) / opts.gridSize - 0.5) * 2
-			const intensity = channelSpread(color) + saturation(color) * 0.8 + (1 - Math.min(Math.abs(centeredY), 1)) * 24
+			const intensity =
+				channelSpread(color) + saturation(color) * 0.8 + (1 - Math.min(Math.abs(centeredY), 1)) * 24
 			return { color, index, row, col, centeredX, centeredY, intensity }
 		})
 		.filter((entry): entry is NonNullable<typeof entry> => entry !== null)
@@ -213,8 +279,16 @@ function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): 
 	const major = weighted.slice(0, opts.majorBlobCount)
 	for (const entry of major) {
 		const seed = colorSeed(entry.color, entry.index)
-		const x = clamp(50 + entry.centeredX * (24 * opts.horizontalStretch) + randomBetween(seed, -opts.jitter, opts.jitter), -opts.edgeBleed, 100 + opts.edgeBleed)
-		const y = clamp(50 + entry.centeredY * 24 + randomBetween(seed + 1, -opts.jitter * 0.6, opts.jitter * 0.6), -12, 112)
+		const x = clamp(
+			50 + entry.centeredX * (24 * opts.horizontalStretch) + randomBetween(seed, -opts.jitter, opts.jitter),
+			-opts.edgeBleed,
+			100 + opts.edgeBleed,
+		)
+		const y = clamp(
+			50 + entry.centeredY * 24 + randomBetween(seed + 1, -opts.jitter * 0.6, opts.jitter * 0.6),
+			-12,
+			112,
+		)
 		const radiusX = opts.majorBlobRadius * randomBetween(seed + 2, 0.9, 1.45) * opts.horizontalStretch
 		const radiusY = opts.majorBlobRadius * randomBetween(seed + 3, 0.75, 1.25) * opts.verticalStretch
 		const opacity = clamp(opts.majorBlobOpacity * randomBetween(seed + 4, 0.82, 1.08), 0.12, 0.95)
@@ -228,9 +302,8 @@ function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): 
 		const entry = major[i]
 		const seed = colorSeed(entry.color, entry.index + 91)
 		const side = i % 2 === 0 ? -1 : 1
-		const x = side < 0
-			? randomBetween(seed, -opts.edgeBleed, 14)
-			: randomBetween(seed, 86, 100 + opts.edgeBleed)
+		const x =
+			side < 0 ? randomBetween(seed, -opts.edgeBleed, 14) : randomBetween(seed, 86, 100 + opts.edgeBleed)
 		const y = clamp(50 + entry.centeredY * 18 + randomBetween(seed + 1, -10, 10), 4, 96)
 		const radiusX = opts.sideBloomRadius * randomBetween(seed + 2, 1.2, 1.8) * opts.horizontalStretch
 		const radiusY = opts.sideBloomRadius * randomBetween(seed + 3, 0.75, 1.15) * opts.verticalStretch

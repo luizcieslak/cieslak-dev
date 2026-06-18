@@ -1,0 +1,145 @@
+---
+type Lang = 'en' | 'pt-br'
+
+interface Props {
+	lang?: Lang
+}
+
+const { lang = 'en' } = Astro.props
+
+const SAMPLES = 1152
+const RATES = [32000, 44100, 48000]
+const RATE_LABELS = ['32 kHz', '44.1 kHz', '48 kHz']
+const DEFAULT_IDX = 1
+
+const locale = lang === 'pt-br' ? 'pt-BR' : 'en-US'
+const nf = new Intl.NumberFormat(locale)
+const nf1 = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+const rate0 = RATES[DEFAULT_IDX]
+const dur0 = (SAMPLES / rate0) * 1000
+const fps0 = 1000 / dur0
+const total0 = Math.round(fps0 * 180)
+
+const strings = {
+	en: {
+		caption:
+			'Each MPEG-1 Layer III frame carries exactly 1152 audio samples. Divide by the sample rate and you get how long a single frame lasts which is the cadence the server has to hold.',
+		samples: 'samples',
+		perFrame: 'per frame',
+		derived: '≈ {fps} frames per second · ~{total} frames in a 3-minute track',
+	},
+	'pt-br': {
+		caption:
+			'Cada frame do MPEG-1 Layer III carrega exatamente 1152 amostras de áudio. Divida pela taxa de amostragem e você tem quanto dura um único frame que é a cadência que o servidor precisa manter.',
+		samples: 'amostras',
+		perFrame: 'por frame',
+		derived: '≈ {fps} frames por segundo · ~{total} frames numa música de 3 minutos',
+	},
+}[lang]
+---
+
+<figure
+	class='frame-duration-demo not-prose my-10 rounded-lg border border-main bg-muted/30 p-4 sm:p-6'
+	data-locale={locale}
+	data-derived-tpl={strings.derived}
+>
+	<figcaption class='mb-5 text-sm leading-relaxed opacity-80'>{strings.caption}</figcaption>
+
+	<div class='flex flex-wrap items-baseline gap-x-2 gap-y-1 font-mono text-base sm:text-lg'>
+		<span class='font-semibold'>{nf.format(SAMPLES)}</span>
+		<span class='text-xs opacity-80'>{strings.samples}</span>
+		<span class='opacity-80'>÷</span>
+		<span class='frame-duration-rate font-semibold text-amber-600 dark:text-amber-400'
+			>{nf.format(rate0)}</span
+		>
+		<span class='text-xs opacity-80'>Hz</span>
+		<span class='opacity-80'>× 1000 =</span>
+		<span class='frame-duration-result font-semibold text-emerald-600 dark:text-emerald-400'
+			>{nf1.format(dur0)}</span
+		>
+		<span class='text-xs opacity-80'>ms {strings.perFrame}</span>
+	</div>
+
+	<div class='mt-4'>
+		<input
+			class='frame-duration-slider demo-slider w-full'
+			style={`--demo-slider-pct: ${(DEFAULT_IDX / (RATES.length - 1)) * 100}%`}
+			type='range'
+			min='0'
+			max='2'
+			step='1'
+			value={DEFAULT_IDX}
+			aria-label='sample rate'
+			aria-valuetext={RATE_LABELS[DEFAULT_IDX]}
+		/>
+		<div class='mt-1 flex justify-between text-xs'>
+			{
+				RATE_LABELS.map((label, i) => (
+					<span class='frame-duration-tick tabular-nums opacity-80' data-idx={i}>
+						{label}
+					</span>
+				))
+			}
+		</div>
+	</div>
+
+	<p class='frame-duration-derived mt-4 font-mono text-xs tabular-nums opacity-80 sm:text-sm'>
+		{strings.derived.replace('{fps}', nf1.format(fps0)).replace('{total}', nf.format(total0))}
+	</p>
+</figure>
+
+<script>
+	const SAMPLES = 1152
+	const RATES = [32000, 44100, 48000]
+	const RATE_LABELS = ['32 kHz', '44.1 kHz', '48 kHz']
+
+	function initDemo(root: HTMLElement): () => void {
+		const locale = root.dataset.locale ?? 'en-US'
+		const derivedTpl = root.dataset.derivedTpl ?? ''
+		const nf = new Intl.NumberFormat(locale)
+		const nf1 = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+		const slider = root.querySelector<HTMLInputElement>('.frame-duration-slider')!
+		const rateEl = root.querySelector<HTMLElement>('.frame-duration-rate')!
+		const resultEl = root.querySelector<HTMLElement>('.frame-duration-result')!
+		const derivedEl = root.querySelector<HTMLElement>('.frame-duration-derived')!
+		const ticks = root.querySelectorAll<HTMLElement>('.frame-duration-tick')
+
+		function update() {
+			const idx = parseInt(slider.value, 10)
+			const rate = RATES[idx]
+			const dur = (SAMPLES / rate) * 1000
+			const fps = 1000 / dur
+			const total = Math.round(fps * 180)
+
+			slider.setAttribute('aria-valuetext', RATE_LABELS[idx])
+			rateEl.textContent = nf.format(rate)
+			resultEl.textContent = nf1.format(dur)
+			derivedEl.textContent = derivedTpl
+				.replace('{fps}', nf1.format(fps))
+				.replace('{total}', nf.format(total))
+			ticks.forEach(tick => {
+				const active = parseInt(tick.dataset.idx ?? '-1', 10) === idx
+				tick.classList.toggle('opacity-80', !active)
+				tick.classList.toggle('font-semibold', active)
+				tick.classList.toggle('opacity-100', active)
+			})
+		}
+
+		const controller = new AbortController()
+		slider.addEventListener('input', update, { signal: controller.signal })
+		update()
+
+		return () => controller.abort()
+	}
+
+	document.addEventListener('astro:page-load', () => {
+		const roots = document.querySelectorAll<HTMLElement>('.frame-duration-demo')
+		if (roots.length === 0) return
+
+		const cleanups = Array.from(roots, initDemo)
+
+		document.addEventListener('astro:before-preparation', () => cleanups.forEach(fn => fn()), { once: true })
+	})
+</script>

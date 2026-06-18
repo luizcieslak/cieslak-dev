@@ -1,0 +1,60 @@
+---
+interface Props {
+	light: string
+	dark: string
+	alt?: string
+	video?: boolean
+	class?: string
+}
+
+const { light, dark, alt = '', video = false, class: className = '' } = Astro.props
+---
+
+{
+	video ? (
+		<video
+			class={className}
+			autoplay
+			muted
+			loop
+			playsinline
+			data-light={light}
+			data-dark={dark}
+			src={light}
+		/>
+	) : (
+		<img class={className} alt={alt} data-light={light} data-dark={dark} src={light} />
+	)
+}
+
+<script>
+	declare global {
+		interface Window {
+			__themeMediaBound?: boolean
+		}
+	}
+
+	function syncThemeMedia() {
+		const isDark = document.documentElement.classList.contains('dark')
+		document.querySelectorAll<HTMLElement>('[data-light][data-dark]').forEach((el) => {
+			const next = isDark ? el.dataset.dark! : el.dataset.light!
+			const media = el as HTMLMediaElement
+			if (media.src?.endsWith(next)) return
+			el.setAttribute('src', next)
+			// videos need an explicit reload to decode the swapped source
+			if (el.tagName === 'VIDEO') (el as HTMLVideoElement).load()
+		})
+	}
+
+	if (!window.__themeMediaBound) {
+		window.__themeMediaBound = true
+		new MutationObserver(syncThemeMedia).observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class'],
+		})
+	}
+
+	// run on first load and after every ViewTransitions navigation
+	syncThemeMedia()
+	document.addEventListener('astro:page-load', syncThemeMedia)
+</script>

@@ -19,7 +19,8 @@ export function useTranslatedPath(lang: keyof typeof ui) {
 		const hasTranslation = defaultLang !== l && routes[l] !== undefined && routes[l][pathName] !== undefined
 		const translatedPath = hasTranslation ? routes[l][pathName] : pathName
 
-		return `/${l}/${translatedPath}/`
+		// An empty translatedPath (e.g. the home link "/") would otherwise yield "/en//"
+		return translatedPath ? `/${l}/${translatedPath}/` : `/${l}/`
 		// turn this below if default lang doesn't need the path prefix
 		// return l === defaultLang ? translatedPath : `/${l}/${translatedPath}`
 	}

@@ -1,0 +1,200 @@
+---
+title: Construindo uma rádio LoFi
+excerpt: Depois de ouvir muito LoFi por aí, decidi criar minha própria rádio.
+publishDate: '2026-05-08'
+seo:
+  image:
+    src: '/lofi'
+    alt: A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.
+---
+import RadioCallout from '../../../components/RadioCallout.astro'
+import AmbientGlowSandbox from '../../../components/AmbientGlowSandbox.astro'
+import AmbientPaletteSandbox from '../../../components/AmbientPaletteSandbox.astro'
+import PreciseTimerDemo from '../../../components/PreciseTimerDemo.astro'
+import FrameDurationDemo from '../../../components/FrameDurationDemo.astro'
+import FanOutDemo from '../../../components/FanOutDemo.astro'
+import BufferCushionDemo from '../../../components/BufferCushionDemo.astro'
+import ThemeMedia from '../../../components/ThemeMedia.astro'
+import Checklist from '../../../components/Checklist.astro'
+
+
+![A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.](/lofi/lofi.png)
+
+Eu curto ouvir um LoFi. Você já provavelmente viu esse vídeo da [rádio](https://www.youtube.com/watch?v=jfKfPfyJRdk) "LoFi Girl", que tem uma menina estudando em um ambiente com músicas chamadas de "LoFi" que ajudam a se concentrar. Essa é uma live no YouTube que existe desde 2018 desde então [quase nunca](https://www.theverge.com/2020/2/24/21150488/chilledcow-lofi-hiphop-livestream-youtube-termiantion-vod-anime-study-girl) parou de tocar. A live ainda é bem popular, com pessoas interagindo constantemente no chat e pegando em média 20 mil visualizações simultâneas todos os dias.
+
+Eu comecei a ouvir _lofi_ como algo que eu colocava de fundo na hora de estudar na universidade. Depois de me formar, também ouvia as mesmas músicas enquanto trabalhava ou precisa focar em algo. Depois de um tempo, percebi que estava ouvindo essas músicas em outras ocasiões também e colocando elas nas minhas playlists pessoais. Foi aí que eu percebi que eu gostava de uma quantidade dessas músicas e que poderia fazer uma playlist com elas.
+
+Nesse ponto, realmente fazer _só_ uma playlist seria mais que suficiente. Porém, como um engenheiro de software que brisa um pouco demais as vezes, pensei em construir uma **rádio inteira a partir de zero**. 
+
+Este é um post sobre o processo de construção da rádio que aprofunda em vários conceitos de matemática e programação. Todo o código que você vê aqui é _open-source_, e portanto aberto para que qualquer pessoa possa construir sua própria versão se quiser.
+
+Antes de começar a ler esse artigo, bora escutar a rádio juntos? só apertar o play aqui em baixo.
+
+<RadioCallout />
+
+
+# Como uma rádio (lofi) pode funcionar
+
+<picture>
+	<source media="(min-width: 768px)" srcset="/lofi/diagram-h.png" />
+	<img src="/lofi/diagram-v.png" alt="Diagram of how the radio is working" />
+</picture>
+
+O diagrama acima representa como a rádio que vc escuta está funcionando nesse momento. Todo o código usado está disponível nesses repositórios:
+
+* [player]() A parte do navegador que consome a _stream_ de aúdio e APIs via HTTP e SSE _(Server sent events)_
+* [lofi-radio]() Aplicação do servidor usando Bun. Armazena os arquivos físicos, cria a _stream_ de áudio e a interface de admin.
+* [shelf]() Gerenciamento de playlist local e sincronização com aplicativos de música tipo Spotify and YouTube Music.
+
+# Client side
+
+A parte do navegador consome 2 APIs principais:
+
+* Audio _stream_ via requisição HTTP que retorna uma _stream de bytes_.
+* Metadados sobre as músicas via _Server Sent Events (SSE)._ Envia eventos para o _client_ com informações sobre a música que está tocando no momento
+* Metadata information about the track via Server Sent Events (SSE). It pings the client with the information about the current track being played.
+
+Se vc colocou a rádio pra tocar ali em cima, vc já está vendo esses metadados no tocador, ou do lado direito do site se está no _desktop_ ou em baixo se estiver no celular.
+
+
+A tag [audio](https://developer.mozilla.org/pt-BR/docs/Web/HTML/Reference/Elements/audio) é bem simples nesse momento, mas tem uma lógica em volta dele para lidar com algumas questões tipo reconexões com o servidor.
+
+Por fim, também possui mecanismos para a tela não apagar em celulares e também usa a [MediaSession API](https://developer.mozilla.org/pt-BR/docs/Web/API/MediaSession) para transmitir as informações para os dispositivos, assim conseguimos ver o nome da música e artista no rádio do carro ou na tela do celular quando na tela de desbloqueio.
+
+## Capas de álbuns e gradiente esfumaçado
+
+Observar as capas de álbuns _enquanto_ a música toca é parte essencial da experiência. A arte de capa não esta ali por acaso geralmente e é criada das mesma maneira que as músicas são.
+
+Tendo isso como base, **o elemento mais importante na página do rádio é justamente essa capa.** É o maior elemento da página e em volta dela há um efeito gradiente de _blur_ das cores que são extraídas da imagem.
+
+<ThemeMedia
+	light="/lofi/example-light.png"
+	dark="/lofi/example-dark.png"
+	alt="A capa do álbum e o efeito de blur aplicado a ela."
+/>
+
+O efeito se chama `AmbientGlow` e fica no arquivo [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). Resumido, o efeito coloca a imagem em uma grade, extrai a cor predominante em cada segmento e desenha camadas de gradiente circulares atrás da imagem. Dê uma fuçada com os controles abaixo, cada _slider_ controla um dos argumentos de `GlowOptions` que o rádio passa na função de `mount()`. 
+
+<AmbientGlowSandbox />
+
+### Como as cores são extraídas
+
+Para cada "quadradinho" na imagem transformada em grade, o código chama `dominantColor()`, que faz um histograma dividindo os pixels em 3 cestas. A função anda por todos os pixels, 4 bytes por vez, filtrando todos que são muito transparentes, muito escuro ou muito brilhantes através uma verificação da _luminance_ da cor e por fim separando o que sobrou em nessas 3 cestas no formato RGB (uma para cada cor primária: vermelho, verde e azul).
+
+```ts
+const lum = 0.299 * r + 0.587 * g + 0.114 * b
+if (skipBlack && lum < blackThreshold) continue
+if (skipWhite && lum > whiteThreshold) continue
+const key = `${Math.floor(r / binSize)},${Math.floor(g / binSize)},${Math.floor(b / binSize)}`
+counts.set(key, (counts.get(key) || 0) + 1)
+```
+
+A cesta com maior número "vence", e sua cor é reconstituída também em uma configuração tripla de `{ r, g, b }`. A variável `binSize` controla o quão "grande" são essas cestas: quanto maior são, mais cores e tons parecidos são unificados em uma cor dominante, cestas pequenas preservam as pequenas variações de cor ao custo de fragmentar a votação da cor dominante. Os filtros de preto e branco existem porque geralmente fundos muito claros ou muito escuros dominariam sempre na contagem e portanto removeriam as cores importantes do gradiente, que são justamente o que estamos procurando no algoritmo.
+
+Exemplo do algoritmo rodando em uma grade 4x4 para que na prática vemos quais são essas cores.
+
+<AmbientPaletteSandbox />
+
+O que é muito louco pra mim é que esse algoritmo pode ser usado também para "pixelar" uma imagem se vc for longe o suficiente aumentando o tamanho da grade:
+
+<ThemeMedia video class="w-full" light="/lofi/pixels-light.mp4" dark="/lofi/pixels-dark.mp4" />
+
+Hoje em dia com monitores super tecnológicos rodando até em resoluções Ultra HD 8k é dificil de lembrar que o que está na nossa frente é de fato uma grade de pixels, muitos pixels, na verdade bilhões de pixels que passam na tela a cada segundo.
+
+# O Servidor
+
+Agora sobre a parte do servidor: É uma aplicação feira em Bun que roda a lógica de _streaming_ do áudio enviando _frames_ para cada ouvinte.
+
+Como queremos simular o comportamento de um rádio, todos os ouvintes precisam receber a mesma quantidade de _frames_ ao mesmo tempo, ou seja, **ouvir a mesma parta da música**. Se um ouvinte entrar "atrasado" na rádio, ele começa a ouvir no meio da música, assim como um ouvinte que estava antes vai ouvir aquela mesma parte. 
+
+<FanOutDemo lang="pt-br" />
+
+## Algo precisa ir a cada 26 milissegundos
+
+Esse número resulta de como interpretamos cada _frame_ de um arquivo MP3.
+
+O formato MP3 é amplamente utilizado para armazenar e transportar arquivos de áudio. Ele é muito eficiente para comprimir o tamanho de um arquivo de áudio enquanto mantém a qualidade do som.
+
+![Um tocador MP3 antigo que revolucionou o conceito de musica portátil](/lofi/mp3-stick.webp)
+(quem tinha um desses aparelhos sabe o que eu estou falando)
+
+Dentro da especificação de arquivos MP3, há varios tipos de compressão de dados. A mais utilizada se chama **MPEG-1 Layer 3**, que é uma compressão que perde um pouco da qualidade da música mas que resulta em um tamanho bem pequeno no final. 
+
+Esse formato de compressão estabelece que **cada frame de um áudio armazena exatamente 1152 amostras de som**. Agora, existe uma métrica em áudio digital chamada de **taxa de amostragem**, que basicamente nos diz quantas vezes por segundo o sinal de áudio analógico é convertido em 1's e 0's.
+
+Na maioria dos áudios, temos uma taxa de amostragem de 44.1 kHz, o que significa que ele é quebrado em 44100 amostras por segundo. Portanto, se a especificação de compressão tiver 1152 amostras por _frame_ e estamos com  44100 amostras a cada segundo, **a duração de cada _frame_ é** `1152 / 44100 = 0.026` segundos, ou **26 ms**.
+
+<FrameDurationDemo lang="pt-br" />
+
+Enfim, para que os ouvintes possam ouvir a música sem interrupções, precisamos enviar um novo _frame_ de áudio a cada 26 milissegundos e manter o servidor de _stream_ funcionando.
+
+Essa cadência de 26ms pode variar sed a taxa de amostragem mudar ou se é música é digitalizada de uma outra maneira. Esse número da cadência **precisa ser respeitado** se não a _stream_ vai sair toda cagada.
+
+## Porque não dá pra usar setTimeout
+
+Para uma implementação de "envie um _frame_ de áudio a cada 26ms", alguém poderia pensar em utilizar o `setTimeout` de maneira ingênua para fazer o código "esperar" esse tempo e enviar de novo.
+
+```ts
+setTimeout(() => {
+  sendAudioFrame()
+}, 26) // funfa? acho que não.
+```
+
+`setTimeout` functiona numa abordagem de melhor esforço quando falamos de precisão na casa dos milissegundos. **Não dá para garantir que o código irá esperar exatamente 26ms**. Pode ser 26, 24, 32ms, dependendo de quão cedo o processador consegue lidar com esse processo. Nós devemos lembrar que as aplicações rodando nos servidores compartilham os recursos com o sistema operacional, assim como qualquer outro processo rodando ao lado.
+
+Então, se isso não funciona, o que fazer? Bom, precisamos implementar algo chamado `PreciseTimer` que consegue responder em um intervalo de milissegundos.
+
+Ele funciona através do cálculo de quanto tempo foi gastado para transmitir o _frame_ de áudio e espera a diferença de tempo para que o total seja `26ms`:
+
+Every `26 ms` the server must hand out one MP3 frame. A naive `setTimeout` loop drifts off the grid; the clock-correcting `PreciseTimer` stays locked to it.
+
+<PreciseTimerDemo lang="pt-br" />
+
+## No mundo real, precisamos de um buffer
+
+Poderíamos continuar enviandos um _frame_ de áudio a cada 26ms que isso iria funcionar na teoria. Porém o mundo real não é tão simples assim: Conexões ruins de celular, latência e CPUs lentas podem afetar a experiência da escuta e no final você acabaria com um áudio todo travado. 
+
+Para evitar esse problema, o servidor mantém uma "gordura" de _buffer_ da transmissão de áudio mais recente e repete ela no instante que um novo ouvinte se conecta, fazendo com que o decodificador tenta alguns segundos de segurança ao invés de nada.
+
+Uma stream em tempo real entrega o áudio rápido o suficiente para tocá-lo — _nunca_ mais rápido. A mesma rede instável alimenta os dois medidores; a única diferença é quanto há no buffer à frente. Com quase nada no buffer, cada engasgo o esvazia e você ouve uma falha. Alguns segundos de folga — o que o `burst-on-connect` instala no momento em que você conecta — absorvem os mesmos engasgos.
+
+<BufferCushionDemo lang="pt-br" />
+
+## Ler arquivos é uma operação que custa
+
+Operações de leitura e escrita de arquivos são geralmente custosas. Para tocar a próxima música na rádio, a próxima leitura de arquivo é acionada alguns segundos _antes_ do fim da música atual, para que a rotina `mp3Parser` tenha tempo suficiente para rodar. Para também mitigar qualquer latência, a leitura do arquivo é feita em modo _async_.
+
+# Arquivos
+
+Nessa versão atual da rádio, apenas o arquivo MP3 é suportado. O suporte de outras extensões e formatos requerem que a mesmo algoritmo que determina a duração de um _frame_ seja replicada para eles, para que a cadência de frames transmitidos na _stream_ seja constante.
+
+A adição de arquivos é feita usando as APIs de Admin que conseguem gerenciar a playlist adicionando, editando metadados ou removendo músicas da playlist.
+
+# Shelf para gerenciamento da playlist
+
+As músicas que vc ouve aqui também estão disponíveis no Spotify e YouTube Music.
+
+Para evitar muito trabalho manual, eu construí uma ferramenta chamada [Shelf](https://github.com/luizcieslak/shelf) que consegue sincronizar a mesma playlist em diferentes plataformas. Eu faço a playlist primeiro no Spotify e depois ele consegue replicar facilmente ela no YouTube Music:
+
+<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf1.mp4" />
+
+Para a sincronização local, é possivel também exportar a playlist em um arquivo JSON **que vem na mesma ordem**, o que é então utilizado no servidor local: 
+
+<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf2.mp4" />
+
+O dahora do Shelf é que, após sincronizar todas as plataformas, a gestão da playlist pode ser feita totalmente por lá. Por exemplo, uma nova música adicionada na playlist vai ser adicionada em todas as plataformas ao mesmo tempo;
+
+<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf3.mp4" />
+
+# Próximos passos
+
+<Checklist
+	items={[
+		{ label: 'Primeiro aviso para remover a rádio do ar por direitos autorais?' },
+		{ label: 'Normalizar os arquivos MP3 no servidor, todos em 44.1kHz bitrate' },
+		{
+			label: 'Aumentar a segurança da parte de Admin do servidor para ser mais que apenas uma <em>secret string</em>',
+		},
+		{ label: 'Abrir uma live no YouTube com a streaming do rádio, talvez até com uma arte (feita por um humano).' },
+	]}
+/>
