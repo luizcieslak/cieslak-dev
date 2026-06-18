@@ -23,6 +23,7 @@ export const ui = {
 		'radio.pause': 'Pause',
 		'radio.volume': 'Volume',
 		'radio.coverSuffix': 'cover',
+		'radio.playlistOn': "Listen to this radio's playlist on",
 	},
 	'pt-br': {
 		'nav.home': 'Início',
@@ -34,6 +35,7 @@ export const ui = {
 		'radio.pause': 'Pausar',
 		'radio.volume': 'Volume',
 		'radio.coverSuffix': 'capa',
+		'radio.playlistOn': 'Ouça a playlist desta rádio no',
 		// 'nav.twitter': 'Twitter',
 	},
 } as const
