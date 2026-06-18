@@ -59,6 +59,15 @@ module.exports = {
 							fontFamily: serif,
 							fontWeight: 600,
 						},
+						// Headings are shifted down one level at render (rehype-shift-heading),
+						// so bump h2/h3 a touch above the default prose scale to keep section
+						// headings clearly larger than body text.
+						h2: {
+							fontSize: '1.75em',
+						},
+						h3: {
+							fontSize: '1.4em',
+						},
 						// blockquote: {
 						// 	border: 0,
 						// 	fontFamily: serif,
@@ -76,6 +85,12 @@ module.exports = {
 				},
 				lg: {
 					css: {
+						h2: {
+							fontSize: '1.875em',
+						},
+						h3: {
+							fontSize: '1.5em',
+						},
 						// blockquote: {
 						// 	paddingLeft: 0,
 						// },

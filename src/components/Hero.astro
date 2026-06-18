@@ -2,11 +2,22 @@
 import { marked } from 'marked'
 import Button from './Button.astro'
 import siteConfig from '../data/site-config'
+import { getLangFromUrl } from '../i18n/utils'
+
+const lang = getLangFromUrl(Astro.url)
+// The homepage hero is just an avatar, so it has no visible heading. Provide a
+// visually-hidden <h1> for SEO/accessibility (one real page heading per page).
+const pageHeadingByLang: Record<string, string> = {
+	en: 'Luiz Cieslak — Web Developer',
+	'pt-br': 'Luiz Cieslak — Desenvolvedor Web',
+}
+const pageHeading = pageHeadingByLang[lang] || pageHeadingByLang.en
 
 const hero = siteConfig.hero
 ---
 
 <section class='w-full flex flex-col gap-8 mb-16 sm:mb-24 mt-8'>
+	<h1 class='sr-only'>{pageHeading}</h1>
 	<div class='avatar'>
 		<img src='/avatar.webp' alt="Luiz Cieslak Profile Picture" />
 	</div>

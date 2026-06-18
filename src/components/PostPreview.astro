@@ -11,17 +11,22 @@ type Props = {
 	post: CollectionEntry<'blog'>
 	class?: string
 	headingLevel?: 'h2' | 'h3'
-	from: 'home' | 'blog'
 }
 
-const { post, class: className, headingLevel = 'h2', from = 'home' } = Astro.props
+const { post, class: className, headingLevel = 'h2' } = Astro.props
 const { title, publishDate, updatedDate, excerpt } = post.data
 const TitleTag = headingLevel
+
+// post.slug is `<lang>/<slug>` (e.g. `en/2026-05-08-lofi`). Build an absolute,
+// trailing-slashed URL so it resolves the same regardless of the current page —
+// a relative href would otherwise append to a slashed URL and 404.
+const [postLang, postSlug] = post.slug.split('/')
+const href = `/${postLang}/blog/${postSlug}/`
 ---
 
 <a
 	class:list={['flex justify-between items-start gap-8 group', className]}
-	href={`${from === 'home' ? post.slug.replace(lang, 'blog') : post.slug.split('/')[1]}/`}
+	href={href}
 >
 	<div class='grow'>
 		<TitleTag

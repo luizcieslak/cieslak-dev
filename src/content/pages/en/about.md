@@ -1,8 +1,6 @@
 ---
-title: Sobre
+title: Luiz Cieslak - Web Developer
 ---
-
-## Luiz Cieslak - Web Developer
 
 **Hiyo!** I'm Luiz Cieslak, a 7+ year of exp web developer based in São Paulo, Brazil.
 
