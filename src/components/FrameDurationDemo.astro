@@ -48,17 +48,17 @@ const strings = {
 
 	<div class='flex flex-wrap items-baseline gap-x-2 gap-y-1 font-mono text-base sm:text-lg'>
 		<span class='font-semibold'>{nf.format(SAMPLES)}</span>
-		<span class='text-xs opacity-50'>{strings.samples}</span>
-		<span class='opacity-50'>÷</span>
+		<span class='text-xs opacity-80'>{strings.samples}</span>
+		<span class='opacity-80'>÷</span>
 		<span class='frame-duration-rate font-semibold text-amber-600 dark:text-amber-400'
 			>{nf.format(rate0)}</span
 		>
-		<span class='text-xs opacity-50'>Hz</span>
-		<span class='opacity-50'>× 1000 =</span>
+		<span class='text-xs opacity-80'>Hz</span>
+		<span class='opacity-80'>× 1000 =</span>
 		<span class='frame-duration-result font-semibold text-emerald-600 dark:text-emerald-400'
 			>{nf1.format(dur0)}</span
 		>
-		<span class='text-xs opacity-50'>ms {strings.perFrame}</span>
+		<span class='text-xs opacity-80'>ms {strings.perFrame}</span>
 	</div>
 
 	<div class='mt-4'>
@@ -76,7 +76,7 @@ const strings = {
 		<div class='mt-1 flex justify-between text-xs'>
 			{
 				RATE_LABELS.map((label, i) => (
-					<span class='frame-duration-tick tabular-nums opacity-50' data-idx={i}>
+					<span class='frame-duration-tick tabular-nums opacity-80' data-idx={i}>
 						{label}
 					</span>
 				))
@@ -84,7 +84,7 @@ const strings = {
 		</div>
 	</div>
 
-	<p class='frame-duration-derived mt-4 font-mono text-xs tabular-nums opacity-70 sm:text-sm'>
+	<p class='frame-duration-derived mt-4 font-mono text-xs tabular-nums opacity-80 sm:text-sm'>
 		{strings.derived.replace('{fps}', nf1.format(fps0)).replace('{total}', nf.format(total0))}
 	</p>
 </figure>
@@ -121,7 +121,7 @@ const strings = {
 				.replace('{total}', nf.format(total))
 			ticks.forEach(tick => {
 				const active = parseInt(tick.dataset.idx ?? '-1', 10) === idx
-				tick.classList.toggle('opacity-50', !active)
+				tick.classList.toggle('opacity-80', !active)
 				tick.classList.toggle('font-semibold', active)
 				tick.classList.toggle('opacity-100', active)
 			})
