@@ -8,12 +8,28 @@
 		--color-bg-main: #f7eed2;
 		--color-bg-muted: #ede2c2;
 		--color-border-main: #171717;
+
+		/* Avatar palette — anchored on the OPPOSITE theme's bg hue so the glow
+		   leans toward the other mode (built-in contrast) while staying a narrow,
+		   harmonious arc. Light mode borrows the dark bg's plum/magenta (~317deg). */
+		--avatar-hue: 317; /* dark-bg hue */
+		--avatar-arc: 70deg; /* how far the hover animation sweeps */
+		--avatar-sat: 55%;
+		--avatar-light: 58%;
+		--avatar-accent: 196; /* the deliberate "surprise" — a cool teal pop */
 	}
 	html.dark {
 		--color-text-main: #f2f1ec;
 		--color-bg-main: #1c0615;
 		--color-bg-muted: #12010c;
 		--color-border-main: #f2f1ec;
+
+		/* Dark mode borrows the light bg's warm gold (~43deg). */
+		--avatar-hue: 43; /* light-bg hue */
+		--avatar-arc: 70deg;
+		--avatar-sat: 70%;
+		--avatar-light: 62%;
+		--avatar-accent: 350; /* surprise: a warm rose pop */
 	}
 
 	/* :root {

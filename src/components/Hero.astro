@@ -49,21 +49,19 @@ const hero = siteConfig.hero
 		z-index: 2;
 	}
 
+	/* Sweeps a narrow, theme-derived hue arc (anchored on the opposite theme's
+	   bg) so the glow always blends, then dips into one deliberate accent hue at
+	   the midpoint for a controlled "surprise" instead of random full-saturation
+	   colors. Hues/sat/light come from the --avatar-* tokens in global.css. */
 	@keyframes cycle-colors {
 		0% {
-			border-color: hsl(0, 100%, 50%);
-		}
-		25% {
-			border-color: hsl(90, 100%, 50%);
+			border-color: hsl(calc(var(--avatar-hue) * 1deg - var(--avatar-arc) / 2) var(--avatar-sat) var(--avatar-light));
 		}
 		50% {
-			border-color: hsl(180, 100%, 50%);
-		}
-		75% {
-			border-color: hsl(270, 100%, 50%);
+			border-color: hsl(calc(var(--avatar-accent) * 1deg) calc(var(--avatar-sat) + 15%) var(--avatar-light));
 		}
 		100% {
-			border-color: hsl(360, 100%, 50%);
+			border-color: hsl(calc(var(--avatar-hue) * 1deg + var(--avatar-arc) / 2) var(--avatar-sat) var(--avatar-light));
 		}
 	}
 
