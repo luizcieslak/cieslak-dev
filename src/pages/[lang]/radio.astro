@@ -118,6 +118,11 @@ const labels = {
 			const artistEl = document.getElementById('radio-artist')!
 			const albumEl = document.getElementById('radio-album')!
 
+			const faviconEl = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+			const originalTitle = document.title
+			const originalFavicon = faviconEl?.getAttribute('href') ?? null
+			const originalFaviconType = faviconEl?.getAttribute('type') ?? null
+
 			let controlsVisibleTimer: ReturnType<typeof setTimeout> | null = null
 
 			function showControlsTemporarily() {
@@ -160,6 +165,17 @@ const labels = {
 					coverEl.alt = track?.title ? `${track.title} ${labelCoverSuffix}` : ''
 				}
 
+				if (track?.title) {
+					document.title = track.artist ? `${track.title} — ${track.artist}` : track.title
+				} else {
+					document.title = originalTitle
+				}
+
+				if (faviconEl && cover && faviconEl.getAttribute('href') !== cover) {
+					faviconEl.setAttribute('href', cover)
+					faviconEl.removeAttribute('type')
+				}
+
 				const showingPlaying = state.wantPlaying
 				playBtn.setAttribute('aria-label', showingPlaying ? labelPause : labelPlay)
 				iconPlay.classList.toggle('hidden', showingPlaying)
@@ -191,6 +207,12 @@ const labels = {
 					unsubscribe()
 					controller.abort()
 					glow.destroy()
+					document.title = originalTitle
+					if (faviconEl) {
+						if (originalFavicon) faviconEl.setAttribute('href', originalFavicon)
+						else faviconEl.removeAttribute('href')
+						if (originalFaviconType) faviconEl.setAttribute('type', originalFaviconType)
+					}
 				},
 				{ once: true },
 			)
