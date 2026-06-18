@@ -15,6 +15,7 @@ import FrameDurationDemo from '../../../components/FrameDurationDemo.astro'
 import FanOutDemo from '../../../components/FanOutDemo.astro'
 import BufferCushionDemo from '../../../components/BufferCushionDemo.astro'
 import ThemeMedia from '../../../components/ThemeMedia.astro'
+import Checklist from '../../../components/Checklist.astro'
 
 
 ![A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.](/lofi/lofi.png)
@@ -187,7 +188,13 @@ O dahora do Shelf é que, após sincronizar todas as plataformas, a gestão da p
 
 # Próximos passos
 
-- [ ] Primeiro aviso para remover a rádio do ar por direitos autorais
-- [ ] Normalizar os arquivos MP3 no servidor, todos em 44.1kHz bitrate
-- [ ] Aumentar a segurança da parte de Admin do servidor para ser mais que apenas uma _secret string_
-- [ ] Abrir uma live no YouTube com a streaming do rádio, talvez até com uma arte (feita por um humano).
+<Checklist
+	items={[
+		{ label: 'Primeiro aviso para remover a rádio do ar por direitos autorais?' },
+		{ label: 'Normalizar os arquivos MP3 no servidor, todos em 44.1kHz bitrate' },
+		{
+			label: 'Aumentar a segurança da parte de Admin do servidor para ser mais que apenas uma <em>secret string</em>',
+		},
+		{ label: 'Abrir uma live no YouTube com a streaming do rádio, talvez até com uma arte (feita por um humano).' },
+	]}
+/>

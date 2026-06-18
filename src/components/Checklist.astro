@@ -1,0 +1,43 @@
+---
+interface Item {
+	label: string
+	done?: boolean
+}
+
+interface Props {
+	items: Item[]
+}
+
+const { items } = Astro.props
+---
+
+<ul class='checklist not-prose my-8 flex flex-col gap-3' role='list'>
+	{
+		items.map(item => (
+			<li class='flex items-start gap-3' data-done={item.done ? '' : undefined}>
+				<span
+					class:list={[
+						'mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-md border transition-colors',
+						item.done
+							? 'border-emerald-500 bg-emerald-500 text-white'
+							: 'border-main bg-muted/40 text-transparent',
+					]}
+					aria-hidden='true'
+				>
+					<svg viewBox='0 0 16 16' fill='none' class='h-3.5 w-3.5'>
+						<path
+							d='M3.5 8.5l3 3 6-7'
+							stroke='currentColor'
+							stroke-width='2'
+							stroke-linecap='round'
+							stroke-linejoin='round'
+						/>
+					</svg>
+				</span>
+				<span class:list={['leading-snug', item.done && 'opacity-60 line-through']}>
+					<Fragment set:html={item.label} />
+				</span>
+			</li>
+		))
+	}
+</ul>
