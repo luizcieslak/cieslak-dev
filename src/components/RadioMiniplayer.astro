@@ -18,10 +18,10 @@ const labels = {
 	data-radio-api={RADIO_API}
 	data-label-play={labels.play}
 	data-label-pause={labels.pause}
-	class='fixed inset-x-0 bottom-0 z-40 hidden overflow-hidden border-t border-main/20 bg-main/95 backdrop-blur-md md:inset-x-auto md:bottom-4 md:left-auto md:right-4 md:max-w-sm md:rounded-full md:border md:shadow-lg data-[visible=true]:flex'
+	class='fixed inset-x-0 bottom-0 z-40 hidden overflow-hidden border-t border-main bg-main/80 backdrop-blur-md backdrop-saturate-150 dark:bg-main/90 md:inset-x-auto md:bottom-4 md:left-auto md:right-4 md:max-w-sm md:rounded-full md:border md:shadow-lg data-[visible=true]:flex'
 >
 	<div
-		class='relative z-10 mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-2 sm:gap-4 sm:py-3 md:mx-0 md:gap-2 md:px-2 md:py-1.5'
+		class='relative z-10 mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-2 [text-shadow:0_1px_3px_rgb(0_0_0/0.45)] sm:gap-4 sm:py-3 md:mx-0 md:gap-2 md:px-2 md:py-1.5 md:[text-shadow:none] dark:[text-shadow:0_1px_4px_rgb(0_0_0/0.7)]'
 	>
 		<a
 			id='radio-miniplayer-link'
@@ -58,14 +58,14 @@ const labels = {
 			id='radio-miniplayer-toggle'
 			type='button'
 			aria-label={labels.play}
-			class='inline-flex h-10 w-10 flex-none items-center justify-center rounded-full border border-main bg-main/95 text-main shadow-sm transition hover:bg-muted md:h-8 md:w-8'
+			class='inline-flex h-10 w-10 flex-none items-center justify-center rounded-full border border-main bg-main/20 text-main shadow-sm transition hover:bg-main/40 md:h-8 md:w-8 md:bg-main/95 md:hover:bg-muted'
 		>
 			<svg
 				id='radio-miniplayer-icon-play'
 				xmlns='http://www.w3.org/2000/svg'
 				viewBox='0 0 24 24'
 				fill='currentColor'
-				class='h-5 w-5 md:h-4 md:w-4'
+				class='h-5 w-5 [filter:drop-shadow(0_1px_2px_rgb(0_0_0/0.6))] md:h-4 md:w-4 md:[filter:none]'
 			>
 				<path d='M8 5v14l11-7z'></path>
 			</svg>
@@ -74,7 +74,7 @@ const labels = {
 				xmlns='http://www.w3.org/2000/svg'
 				viewBox='0 0 24 24'
 				fill='currentColor'
-				class='hidden h-5 w-5 md:h-4 md:w-4'
+				class='hidden h-5 w-5 [filter:drop-shadow(0_1px_2px_rgb(0_0_0/0.6))] md:h-4 md:w-4 md:[filter:none]'
 			>
 				<path d='M6 5h4v14H6zM14 5h4v14h-4z'></path>
 			</svg>
