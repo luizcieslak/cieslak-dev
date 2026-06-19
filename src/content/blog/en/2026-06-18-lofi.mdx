@@ -20,7 +20,7 @@ import Checklist from '../../../components/Checklist.astro'
 
 ![The classic "LoFi Girl" image but with a reinterpretation of its art imagining if she lived in Brazil.](/lofi-radio/lofi.png)
 
-I like LoFi music. put this more at the bottom
+I like LoFi music.
 
 You probably have seen or listened to the classic "LoFi Girl" [radio](https://www.youtube.com/watch?v=jfKfPfyJRdk) in the past. It is still very much a big hit: if you open that link now you should see at least 10k viewers in that stream, with people interacting in the chat constantly. 
 
@@ -82,12 +82,6 @@ The effect lives in [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.t
 <AmbientGlowSandbox />
 
 ### How colors are extracted
-
-we should showcase color extraction first then blur?
-
-"first, we need to extract the colors from the image"
-
-show tv inspiration
 
 For each cell in the sampling grid the code calls `dominantColor()`, which is just a histogram with three escape hatches. It walks the pixel buffer four bytes at a time, drops anything that's too transparent, too dark, or too bright via a simple luminance check, and then bins what's left into coarse RGB buckets:
 
