@@ -4,7 +4,7 @@ excerpt: After listening to LoFi for quite some time, I decided to build my own 
 publishDate: '2026-06-18'
 seo:
   image:
-    src: '/lofi'
+    src: '/lofi-radio/lofi.png'
     alt: The classic "LoFi Girl" image but with a reinterpretation of it if she lived in Brazil.
 ---
 import RadioCallout from '../../../components/RadioCallout.astro'
@@ -18,7 +18,7 @@ import ThemeMedia from '../../../components/ThemeMedia.astro'
 import Checklist from '../../../components/Checklist.astro'
 
 
-![The classic "LoFi Girl" image but with a reinterpretation of its art imagining if she lived in Brazil.](/lofi/lofi.png)
+![The classic "LoFi Girl" image but with a reinterpretation of its art imagining if she lived in Brazil.](/lofi-radio/lofi.png)
 
 I like LoFi music.
 
@@ -39,8 +39,8 @@ Before continuing reading, what if we listen to the music together? Just press t
 # How a (lofi) radio could work
 
 <picture>
-	<source media="(min-width: 768px)" srcset="/lofi/diagram-h.png" />
-	<img src="/lofi/diagram-v.png" alt="Diagram of how the radio is working" />
+	<source media="(min-width: 768px)" srcset="/lofi-radio/diagram-h.png" />
+	<img src="/lofi-radio/diagram-v.png" alt="Diagram of how the radio is working" />
 </picture>
 
 Below we have the diagram of how it is working right now. All the code used here is open source on this repositories:
@@ -72,8 +72,8 @@ Look and observe the album cover _while_ listening to the music **is a crucial p
 Thinking about it, **the most important element on the radio page should be the album cover**. It is the biggest element there and around it there is a custom blur gradient effect from the colors that are extracted from the image.
 
 <ThemeMedia
-	light="/lofi/example-light.png"
-	dark="/lofi/example-dark.png"
+	light="/lofi-radio/example-light.png"
+	dark="/lofi-radio/example-dark.png"
 	alt="The album cover and the blur effect that is applied to it."
 />
 
@@ -101,7 +101,7 @@ Here's the same algorithm running on a 4×4 grid so you can see the palette it p
 
 What is crazy for me is that the exact same algorithm can be used to pixelize an image if you go long enough increasing the grid size. 
 
-<ThemeMedia video class="w-full" light="/lofi/pixels-light.mp4" dark="/lofi/pixels-dark.mp4" />
+<ThemeMedia video class="w-full" light="/lofi-radio/pixels-light.mp4" dark="/lofi-radio/pixels-dark.mp4" />
 
 Nowadays with Ultra HD 8k screens it is easy to forget the image we see in front of us in a computer is a grid of pixels, but we are actually seeing billions of them at every single frame.
 
@@ -119,7 +119,8 @@ The number comes from how we parse the MP3 frames.
 
 The MP3 format itself is widely used to store and transport audio files. It is very efficient to compress an audio file size while maintaing the quality.
 
-![An mp3 player device that revolutionized the concept of portable music](/lofi/mp3-stick.webp)
+when it landed was a success as ppl could listen to music without needing to carry anything rather a smaller device like iPod or this stick below.
+![An mp3 player device that revolutionized the concept of portable music](/lofi-radio/mp3-stick.webp)
 (the ones that had one of these know what I am talking about.)
 
 Inside the MP3 spec, there are several ways of compressing data. The most used of them, **MPEG-1 Layer 3**, is a very efficient lossy compression, meaning it can store the audio in a good quality while keeping the size file short. 
@@ -180,15 +181,15 @@ The playlist you can hear here is also available in Spotify and YouTube Music.
 
 To avoid too much manual work, I built a tool called [Shelf](https://github.com/luizcieslak/shelf) that can sync the playlist state between both platforms. I originally built the playlist on Spotify and then easily replicate it on YouTube Music:
 
-<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf1.mp4" />
+<video class='w-full' autoplay muted loop playsinline src="/lofi-radio/shelf1.mp4" />
 
 For local sync, we are also able to export the playlist as a JSON file **that comes in order**, which is the one we use at the lofi-radio server:
 
-<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf2.mp4" />
+<video class='w-full' autoplay muted loop playsinline src="/lofi-radio/shelf2.mp4" />
 
 The cool thing about Shelf is that, after we sync the playlists between all platforms, we can use the tool to add new songs which will be propagated to all:
 
-<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf3.mp4" />
+<video class='w-full' autoplay muted loop playsinline src="/lofi-radio/shelf3.mp4" />
 
 # Next steps
 
