@@ -20,13 +20,11 @@ import Checklist from '../../../components/Checklist.astro'
 
 ![The classic "LoFi Girl" image but with a reinterpretation of its art imagining if she lived in Brazil.](/lofi-radio/lofi.png)
 
-I like LoFi music.
-
 You probably have seen or listened to the classic "LoFi Girl" [radio](https://www.youtube.com/watch?v=jfKfPfyJRdk) in the past. It is still very much a big hit: if you open that link now you should see at least 10k viewers in that stream, with people interacting in the chat constantly. 
 
-The stream exists _almost_ interruptly since 2018 https://www.theverge.com/2020/2/24/21150488/chilledcow-lofi-hiphop-livestream-youtube-termiantion-vod-anime-study-girl
+The stream exists [almost interruptly](https://www.theverge.com/2020/2/24/21150488/chilledcow-lofi-hiphop-livestream-youtube-termiantion-vod-anime-study-girl) since 2018. The live is still very popular, with around ~20k viewers every single day and some interacting in the chat.
 
-For me, "lofi" music started as something I would put as a background music when studying at college. After graduated, I began also listening it when working. Finally, I realized I was listening to them in another ocasions as well: I started to add it in my personal playlist, then I noticed: well, I might have listened so much to it that I might have a good collection of my favourite ones and therefore I decided to share it in the wild.
+I like LoFi music. For me, it started as something I would put as a background music when studying at college. After graduated, I began also listening it when working. Finally, I realized I was listening to them in another ocasions as well: I started to add it in my personal playlist, then I noticed: well, I might have listened so much to it that I might have a good collection of my favourite ones and therefore I decided to share it in the wild.
 
 I started listening to the genre more or less when the graduating from college which helped me focus and study. Then, I became to also listen to it when working. After some years, I noticed I was also listening to it in another ocasions too, adding it to playlists here and there and then I realized that I might have some good collection of tracks and therefore could have my own playlist to share to the world.
 
@@ -77,13 +75,17 @@ Thinking about it, **the most important element on the radio page should be the 
 	alt="The album cover and the blur effect that is applied to it."
 />
 
-The effect lives in [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). At a high level it samples the cover image on a small grid, picks one dominant color per cell, and paints a stack of soft radial gradients on layers sitting behind the image. Have a play with the controls below — every slider maps directly to a field of `GlowOptions` that the radio page passes into `mount()`.
+The effect lives in [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). At a high level it samples the cover image on a small grid, picks one dominant color per cell, and paints a stack of soft radial gradients on layers sitting behind the image. 
 
-<AmbientGlowSandbox />
+The inspiration is the "Ambilight" effect in Philips TVs where they put a strip of LED lights behind the TV that changes from the colors appearing in the screen.
 
-### How colors are extracted
+![Philips Ambilight effect](/lofi-radio/tv.png)
 
-For each cell in the sampling grid the code calls `dominantColor()`, which is just a histogram with three escape hatches. It walks the pixel buffer four bytes at a time, drops anything that's too transparent, too dark, or too bright via a simple luminance check, and then bins what's left into coarse RGB buckets:
+### Colors
+
+First of all, like the TV, we need to extract _which_ colors we will show in the gradient. 
+
+We divide the image in a grid and for each cell in the sampling grid the code calls `dominantColor()`, which is just a histogram with three escape hatches. It walks the pixel buffer four bytes at a time, drops anything that's too transparent, too dark, or too bright via a simple luminance check, and then bins what's left into coarse RGB buckets:
 
 ```ts
 const lum = 0.299 * r + 0.587 * g + 0.114 * b
@@ -104,6 +106,12 @@ What is crazy for me is that the exact same algorithm can be used to pixelize an
 <ThemeMedia video class="w-full" light="/lofi-radio/pixels-light.mp4" dark="/lofi-radio/pixels-dark.mp4" />
 
 Nowadays with Ultra HD 8k screens it is easy to forget the image we see in front of us in a computer is a grid of pixels, but we are actually seeing billions of them at every single frame.
+
+When we have the colors set, we can then mount our glow effect. It is highly customizable and can create a wide variety of effects.
+
+Have a play with the controls below — every slider maps directly to a field of `GlowOptions` that the radio page passes into `mount()`.
+
+<AmbientGlowSandbox />
 
 # Server side
 
