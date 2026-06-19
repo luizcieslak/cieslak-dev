@@ -1,6 +1,6 @@
 ---
 title: Building a LoFi radio
-excerpt: After listening to LoFi for quite some time, I decided to build my own overengineered radio station.
+excerpt: After listening to LoFi for quite some time, I decided to build my own radio station.
 publishDate: '2026-06-18'
 seo:
   image:
@@ -77,7 +77,7 @@ Thinking about it, **the most important element on the radio page should be the 
 
 The effect lives in [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). At a high level it samples the cover image on a small grid, picks one dominant color per cell, and paints a stack of soft radial gradients on layers sitting behind the image. 
 
-The inspiration is the "Ambilight" effect in Philips TVs where they put a strip of LED lights behind the TV that changes from the colors appearing in the screen.
+The inspiration is the "Ambilight" effect in Philips TVs where they put a strip of LED lights behind the TV that changes according to the colors appearing in the screen.
 
 ![Philips Ambilight effect](/lofi-radio/tv.png)
 
@@ -127,9 +127,8 @@ The number comes from how we parse the MP3 frames.
 
 The MP3 format itself is widely used to store and transport audio files. It is very efficient to compress an audio file size while maintaing the quality.
 
-when it landed was a success as ppl could listen to music without needing to carry anything rather a smaller device like iPod or this stick below.
+When it landed was a success as people could listen to music without needing to carry anything but a small device like iPod or this stick below.
 ![An mp3 player device that revolutionized the concept of portable music](/lofi-radio/mp3-stick.webp)
-(the ones that had one of these know what I am talking about.)
 
 Inside the MP3 spec, there are several ways of compressing data. The most used of them, **MPEG-1 Layer 3**, is a very efficient lossy compression, meaning it can store the audio in a good quality while keeping the size file short. 
 
