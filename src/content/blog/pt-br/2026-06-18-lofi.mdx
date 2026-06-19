@@ -20,9 +20,9 @@ import Checklist from '../../../components/Checklist.astro'
 
 ![A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.](/lofi-radio/lofi.png)
 
-Eu curto ouvir um LoFi. Você já provavelmente viu esse vídeo da [rádio](https://www.youtube.com/watch?v=jfKfPfyJRdk) "LoFi Girl", que tem uma menina estudando em um ambiente com músicas chamadas de "LoFi" que ajudam a se concentrar. Essa é uma live no YouTube que existe desde 2018 desde então [quase nunca](https://www.theverge.com/2020/2/24/21150488/chilledcow-lofi-hiphop-livestream-youtube-termiantion-vod-anime-study-girl) parou de tocar. A live ainda é bem popular, com pessoas interagindo constantemente no chat e pegando em média 20 mil visualizações simultâneas todos os dias.
+Você já provavelmente viu esse vídeo da [rádio](https://www.youtube.com/watch?v=jfKfPfyJRdk) "LoFi Girl", que tem uma menina estudando em um ambiente com músicas chamadas de "LoFi" que ajudam a se concentrar. Essa é uma live no YouTube que existe desde 2018 desde então [quase nunca](https://www.theverge.com/2020/2/24/21150488/chilledcow-lofi-hiphop-livestream-youtube-termiantion-vod-anime-study-girl) parou de tocar. A live ainda é bem popular, com pessoas interagindo constantemente no chat e pegando em média 20 mil visualizações simultâneas todos os dias.
 
-Eu comecei a ouvir _lofi_ como algo que eu colocava de fundo na hora de estudar na universidade. Depois de me formar, também ouvia as mesmas músicas enquanto trabalhava ou precisa focar em algo. Depois de um tempo, percebi que estava ouvindo essas músicas em outras ocasiões também e colocando elas nas minhas playlists pessoais. Foi aí que eu percebi que eu gostava de uma quantidade dessas músicas e que poderia fazer uma playlist com elas.
+Eu curto ouvir um lofi. Para mim começou como algo que eu colocava de fundo na hora de estudar na universidade. Depois de me formar, também ouvia as mesmas músicas enquanto trabalhava ou precisa focar em algo. Depois de um tempo, percebi que estava ouvindo essas músicas em outras ocasiões também e colocando elas nas minhas playlists pessoais. Foi aí que eu percebi que eu gostava de uma quantidade dessas músicas e que poderia fazer uma playlist com elas.
 
 Nesse ponto, realmente fazer _só_ uma playlist seria mais que suficiente. Porém, como um engenheiro de software que brisa um pouco demais as vezes, pensei em construir uma **rádio inteira a partir de zero**. 
 
@@ -73,13 +73,17 @@ Tendo isso como base, **o elemento mais importante na página do rádio é justa
 	alt="A capa do álbum e o efeito de blur aplicado a ela."
 />
 
-O efeito se chama `AmbientGlow` e fica no arquivo [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). Resumido, o efeito coloca a imagem em uma grade, extrai a cor predominante em cada segmento e desenha camadas de gradiente circulares atrás da imagem. Dê uma fuçada com os controles abaixo, cada _slider_ controla um dos argumentos de `GlowOptions` que o rádio passa na função de `mount()`. 
+O efeito se chama `AmbientGlow` e fica no arquivo [src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts). Resumido, o efeito coloca a imagem em uma grade, extrai a cor predominante em cada segmento e desenha camadas de gradiente circulares atrás da imagem. 
 
-<AmbientGlowSandbox />
+A inspiração é o efeito "Ambilight" em algumas televisões da Philips, onde ele coloca um fio de LED atrás da TV que muda de acordo com cores aparecendo na tela.
 
-### Como as cores são extraídas
+![Philips Ambilight effect](/lofi-radio/tv.png)
 
-Para cada "quadradinho" na imagem transformada em grade, o código chama `dominantColor()`, que faz um histograma dividindo os pixels em 3 cestas. A função anda por todos os pixels, 4 bytes por vez, filtrando todos que são muito transparentes, muito escuro ou muito brilhantes através uma verificação da _luminance_ da cor e por fim separando o que sobrou em nessas 3 cestas no formato RGB (uma para cada cor primária: vermelho, verde e azul).
+### cores
+
+Primeiro de tudo, assim como a TV, precisamos saber _quais_ cores vamos mostrar no gradiente.
+
+Dividimos a imagem em uma grade e para cada "quadradinho" na imagem transformada em grade, o código chama `dominantColor()`, que faz um histograma dividindo os pixels em 3 cestas. A função anda por todos os pixels, 4 bytes por vez, filtrando todos que são muito transparentes, muito escuro ou muito brilhantes através uma verificação da _luminance_ da cor e por fim separando o que sobrou em nessas 3 cestas no formato RGB (uma para cada cor primária: vermelho, verde e azul).
 
 ```ts
 const lum = 0.299 * r + 0.587 * g + 0.114 * b
@@ -100,6 +104,13 @@ O que é muito louco pra mim é que esse algoritmo pode ser usado também para "
 <ThemeMedia video class="w-full" light="/lofi-radio/pixels-light.mp4" dark="/lofi-radio/pixels-dark.mp4" />
 
 Hoje em dia com monitores super tecnológicos rodando até em resoluções Ultra HD 8k é dificil de lembrar que o que está na nossa frente é de fato uma grade de pixels, muitos pixels, na verdade bilhões de pixels que passam na tela a cada segundo.
+
+Com as cores definidas, podemos então montar o _glow_.
+Ele é altamente personalizável e pode criar uma ampla variedade de efeitos visuais.
+
+Dê uma fuçada com os controles abaixo, cada _slider_ controla um dos argumentos de `GlowOptions` que o rádio passa na função de `mount()`.
+
+<AmbientGlowSandbox />
 
 # O Servidor
 
