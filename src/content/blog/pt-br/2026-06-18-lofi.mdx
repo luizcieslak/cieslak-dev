@@ -4,7 +4,7 @@ excerpt: Depois de ouvir muito LoFi por aí, decidi criar minha própria rádio.
 publishDate: '2026-06-18'
 seo:
   image:
-    src: '/lofi'
+    src: '/lofi-radio/lofi.png'
     alt: A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.
 ---
 import RadioCallout from '../../../components/RadioCallout.astro'
@@ -18,7 +18,7 @@ import ThemeMedia from '../../../components/ThemeMedia.astro'
 import Checklist from '../../../components/Checklist.astro'
 
 
-![A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.](/lofi/lofi.png)
+![A imagem clássica da "LoFi Girl" reinterpretada como se ela morasse no Brasil.](/lofi-radio/lofi.png)
 
 Eu curto ouvir um LoFi. Você já provavelmente viu esse vídeo da [rádio](https://www.youtube.com/watch?v=jfKfPfyJRdk) "LoFi Girl", que tem uma menina estudando em um ambiente com músicas chamadas de "LoFi" que ajudam a se concentrar. Essa é uma live no YouTube que existe desde 2018 desde então [quase nunca](https://www.theverge.com/2020/2/24/21150488/chilledcow-lofi-hiphop-livestream-youtube-termiantion-vod-anime-study-girl) parou de tocar. A live ainda é bem popular, com pessoas interagindo constantemente no chat e pegando em média 20 mil visualizações simultâneas todos os dias.
 
@@ -36,8 +36,8 @@ Antes de começar a ler esse artigo, bora escutar a rádio juntos? só apertar o
 # Como uma rádio (lofi) pode funcionar
 
 <picture>
-	<source media="(min-width: 768px)" srcset="/lofi/diagram-h.png" />
-	<img src="/lofi/diagram-v.png" alt="Diagram of how the radio is working" />
+	<source media="(min-width: 768px)" srcset="/lofi-radio/diagram-h.png" />
+	<img src="/lofi-radio/diagram-v.png" alt="Diagram of how the radio is working" />
 </picture>
 
 O diagrama acima representa como a rádio que vc escuta está funcionando nesse momento. Todo o código usado está disponível nesses repositórios:
@@ -68,8 +68,8 @@ Observar as capas de álbuns _enquanto_ a música toca é parte essencial da exp
 Tendo isso como base, **o elemento mais importante na página do rádio é justamente essa capa.** É o maior elemento da página e em volta dela há um efeito gradiente de _blur_ das cores que são extraídas da imagem.
 
 <ThemeMedia
-	light="/lofi/example-light.png"
-	dark="/lofi/example-dark.png"
+	light="/lofi-radio/example-light.png"
+	dark="/lofi-radio/example-dark.png"
 	alt="A capa do álbum e o efeito de blur aplicado a ela."
 />
 
@@ -97,7 +97,7 @@ Exemplo do algoritmo rodando em uma grade 4x4 para que na prática vemos quais s
 
 O que é muito louco pra mim é que esse algoritmo pode ser usado também para "pixelar" uma imagem se vc for longe o suficiente aumentando o tamanho da grade:
 
-<ThemeMedia video class="w-full" light="/lofi/pixels-light.mp4" dark="/lofi/pixels-dark.mp4" />
+<ThemeMedia video class="w-full" light="/lofi-radio/pixels-light.mp4" dark="/lofi-radio/pixels-dark.mp4" />
 
 Hoje em dia com monitores super tecnológicos rodando até em resoluções Ultra HD 8k é dificil de lembrar que o que está na nossa frente é de fato uma grade de pixels, muitos pixels, na verdade bilhões de pixels que passam na tela a cada segundo.
 
@@ -115,7 +115,7 @@ Esse número resulta de como interpretamos cada _frame_ de um arquivo MP3.
 
 O formato MP3 é amplamente utilizado para armazenar e transportar arquivos de áudio. Ele é muito eficiente para comprimir o tamanho de um arquivo de áudio enquanto mantém a qualidade do som.
 
-![Um tocador MP3 antigo que revolucionou o conceito de musica portátil](/lofi/mp3-stick.webp)
+![Um tocador MP3 antigo que revolucionou o conceito de musica portátil](/lofi-radio/mp3-stick.webp)
 (quem tinha um desses aparelhos sabe o que eu estou falando)
 
 Dentro da especificação de arquivos MP3, há varios tipos de compressão de dados. A mais utilizada se chama **MPEG-1 Layer 3**, que é uma compressão que perde um pouco da qualidade da música mas que resulta em um tamanho bem pequeno no final. 
@@ -176,15 +176,15 @@ As músicas que vc ouve aqui também estão disponíveis no Spotify e YouTube Mu
 
 Para evitar muito trabalho manual, eu construí uma ferramenta chamada [Shelf](https://github.com/luizcieslak/shelf) que consegue sincronizar a mesma playlist em diferentes plataformas. Eu faço a playlist primeiro no Spotify e depois ele consegue replicar facilmente ela no YouTube Music:
 
-<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf1.mp4" />
+<video class='w-full' autoplay muted loop playsinline src="/lofi-radio/shelf1.mp4" />
 
 Para a sincronização local, é possivel também exportar a playlist em um arquivo JSON **que vem na mesma ordem**, o que é então utilizado no servidor local: 
 
-<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf2.mp4" />
+<video class='w-full' autoplay muted loop playsinline src="/lofi-radio/shelf2.mp4" />
 
 O dahora do Shelf é que, após sincronizar todas as plataformas, a gestão da playlist pode ser feita totalmente por lá. Por exemplo, uma nova música adicionada na playlist vai ser adicionada em todas as plataformas ao mesmo tempo;
 
-<video class='w-full' autoplay muted loop playsinline src="/lofi/shelf3.mp4" />
+<video class='w-full' autoplay muted loop playsinline src="/lofi-radio/shelf3.mp4" />
 
 # Próximos passos
 

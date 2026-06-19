@@ -1,3 +1,4 @@
 {
-	"trailingSlash": true
+	"trailingSlash": true,
+	"redirects": [{ "source": "/lofi", "destination": "/en/radio/", "permanent": false }]
 }
