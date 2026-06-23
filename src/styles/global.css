@@ -142,6 +142,24 @@
 		outline-offset: 2px;
 	}
 
+	/* Touch devices: grow the (invisible) hit area to the 44px Apple-HIG target and
+	   enlarge the thumb so the sliders are grabbable. The visible 5px track is
+	   unchanged, so rows look the same height — only the grab zone grows. */
+	@media (pointer: coarse) {
+		.demo-slider {
+			height: 2.75rem;
+		}
+		.demo-slider::-webkit-slider-thumb {
+			height: 20px;
+			width: 20px;
+			margin-top: -7.5px;
+		}
+		.demo-slider::-moz-range-thumb {
+			height: 20px;
+			width: 20px;
+		}
+	}
+
 	@media (forced-colors: active) {
 		.demo-slider::-webkit-slider-runnable-track {
 			background: linear-gradient(
