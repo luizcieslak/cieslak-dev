@@ -114,7 +114,7 @@ const strings = {
 </style>
 
 <script>
-	const N = 12 // frames emitted per cycle
+	const N = matchMedia('(min-width: 640px)').matches ? 12 : 7 // frames emitted per cycle
 	const PAD = 7 // % left padding before the first grid line
 	const SPAN = 64 // % width the grid occupies (leaves headroom for drift)
 	const GAP = SPAN / (N - 1)
