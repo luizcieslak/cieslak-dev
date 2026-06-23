@@ -1,18 +1,45 @@
 ---
+import fs from 'node:fs'
+import path from 'node:path'
+import { getLangFromUrl, useTranslations } from '../i18n/utils'
+
 interface Props {
 	defaultImage?: string
 	defaultAlt?: string
 }
 
 const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbox preview' } = Astro.props
+
+const lang = getLangFromUrl(Astro.url)
+const t = useTranslations(lang)
+
+// Build-time directory read (Node, not the browser): list every cover in
+// public/lofi-radio/glow-demo/ so dropping a new file in is all it takes to add
+// it to the Randomize rotation — no code change. public/ isn't seen by
+// import.meta.glob, so fs.readdirSync is the way.
+const GLOW_DEMO_DIR = 'lofi-radio/glow-demo'
+const IMAGE_RE = /\.(png|jpe?g|webp|avif|gif)$/i
+let demoImages: string[] = []
+try {
+	demoImages = fs
+		.readdirSync(path.join(process.cwd(), 'public', GLOW_DEMO_DIR))
+		.filter(name => IMAGE_RE.test(name))
+		.sort()
+		.map(name => `/${GLOW_DEMO_DIR}/${name}`)
+} catch {
+	demoImages = []
+}
 ---
 
-<figure class='ambient-glow-sandbox not-prose my-10 rounded-lg border border-main bg-muted/30 p-4'>
+<figure
+	class='ambient-glow-sandbox not-prose my-10 rounded-lg border border-main bg-muted/30 p-4'
+	data-demo-images={JSON.stringify(demoImages)}
+>
 	<div
 		class='ambient-glow-sandbox-stage relative mx-auto flex aspect-square w-full max-w-md items-center justify-center overflow-visible'
 	>
 		<img
-			class='ambient-glow-sandbox-img relative z-10 block h-[200px] w-full rounded-md object-cover shadow-md'
+			class='ambient-glow-sandbox-img relative z-10 block w-auto h-[300px] rounded-md object-cover shadow-md'
 			src={defaultImage}
 			alt={defaultAlt}
 			crossorigin='anonymous'
@@ -24,6 +51,13 @@ const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbo
 			<span class='opacity-80 sm:w-32 sm:shrink-0'>Upload image</span>
 			<input class='ambient-glow-sandbox-upload min-w-0 sm:flex-1' type='file' accept='image/*' />
 		</label>
+
+		<button
+			type='button'
+			class='ambient-glow-sandbox-randomize justify-self-start rounded-md border border-main px-3 py-1.5 font-medium opacity-90 transition-opacity hover:opacity-100 sm:self-start'
+		>
+			🎲 {t('glow.randomize')}
+		</button>
 
 		<!-- curated controls -->
 		<div class='ambient-glow-sandbox-controls grid gap-x-2 sm:gap-y-2'>
@@ -93,6 +127,17 @@ const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbo
 		{ key: 'skipWhite', label: 'Skip near-white pixels', default: true },
 	]
 
+	const SPEC_BY_KEY = new Map<ControlKey, SliderSpec>(
+		[...CURATED, ...ADVANCED_SLIDERS].map(spec => [spec.key, spec]),
+	)
+
+	// Snap a uniformly random value to the slider's step so the output reads cleanly.
+	function randomSliderValue(spec: SliderSpec): number {
+		const steps = Math.round((spec.max - spec.min) / spec.step)
+		const value = spec.min + Math.floor(Math.random() * (steps + 1)) * spec.step
+		return parseFloat(Math.min(spec.max, value).toFixed(4))
+	}
+
 	function buildSliderRow(spec: SliderSpec): HTMLElement {
 		const row = document.createElement('label')
 		row.className = 'grid grid-cols-[1fr_auto] items-center gap-x-3 sm:flex sm:items-center'
@@ -127,6 +172,9 @@ const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbo
 			const curatedHost = root.querySelector<HTMLElement>('.ambient-glow-sandbox-controls')!
 			const advancedHost = root.querySelector<HTMLElement>('.ambient-glow-sandbox-advanced')!
 			const advancedToggle = root.querySelector<HTMLButtonElement>('.ambient-glow-sandbox-toggle-advanced')!
+			const randomize = root.querySelector<HTMLButtonElement>('.ambient-glow-sandbox-randomize')!
+			// Covers discovered at build time from public/lofi-radio/glow-demo/ (see frontmatter).
+			const demoImages = JSON.parse(root.dataset.demoImages || '[]') as string[]
 
 			CURATED.forEach(spec => curatedHost.appendChild(buildSliderRow(spec)))
 			ADVANCED_SLIDERS.forEach(spec => advancedHost.appendChild(buildSliderRow(spec)))
@@ -195,7 +243,8 @@ const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbo
 				input.addEventListener(
 					'change',
 					() => {
-						;(pendingPatch as Record<string, number | boolean>)[input.dataset.key as ControlKey] = input.checked
+						;(pendingPatch as Record<string, number | boolean>)[input.dataset.key as ControlKey] =
+							input.checked
 						schedule()
 					},
 					{ signal },
@@ -222,6 +271,36 @@ const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbo
 					lastObjectUrl = URL.createObjectURL(file)
 					img.removeAttribute('crossorigin')
 					img.src = lastObjectUrl
+				},
+				{ signal },
+			)
+
+			randomize.addEventListener(
+				'click',
+				() => {
+					// Only the simple panel's sliders are randomized — the advanced controls
+					// are left untouched. Drive the existing input/change listeners so the
+					// output labels, slider fill, fadeMs override and glow update through one path.
+					curatedHost.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(input => {
+						const spec = SPEC_BY_KEY.get(input.dataset.key as ControlKey)
+						if (!spec) return
+						input.value = String(randomSliderValue(spec))
+						input.dispatchEvent(new Event('input', { bubbles: true }))
+						input.dispatchEvent(new Event('change', { bubbles: true }))
+					})
+
+					// Switch to a different demo cover (skip the one already showing).
+					const choices = demoImages.filter(src => !img.src.endsWith(src))
+					const pool = choices.length ? choices : demoImages
+					const next = pool[Math.floor(Math.random() * pool.length)]
+					if (next) {
+						if (lastObjectUrl) {
+							URL.revokeObjectURL(lastObjectUrl)
+							lastObjectUrl = null
+						}
+						img.setAttribute('crossorigin', 'anonymous')
+						img.src = next
+					}
 				},
 				{ signal },
 			)

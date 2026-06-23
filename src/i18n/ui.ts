@@ -24,6 +24,7 @@ export const ui = {
 		'radio.volume': 'Volume',
 		'radio.coverSuffix': 'cover',
 		'radio.playlistOn': "Listen to this radio's playlist on",
+		'glow.randomize': 'Randomize',
 	},
 	'pt-br': {
 		'nav.home': 'Início',
@@ -36,6 +37,7 @@ export const ui = {
 		'radio.volume': 'Volume',
 		'radio.coverSuffix': 'capa',
 		'radio.playlistOn': 'Ouça a playlist desta rádio no',
+		'glow.randomize': 'Aleatório',
 		// 'nav.twitter': 'Twitter',
 	},
 } as const
