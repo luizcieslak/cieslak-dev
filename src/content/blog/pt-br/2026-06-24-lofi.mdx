@@ -89,7 +89,10 @@ Dividimos a imagem em uma grade e para cada "quadradinho" na imagem transformada
 const lum = 0.299 * r + 0.587 * g + 0.114 * b
 if (skipBlack && lum < blackThreshold) continue
 if (skipWhite && lum > whiteThreshold) continue
-const key = `${Math.floor(r / binSize)},${Math.floor(g / binSize)},${Math.floor(b / binSize)}`
+const rb = Math.floor(r / binSize)
+const gb = Math.floor(g / binSize)
+const bb = Math.floor(b / binSize)
+const key = `${rb},${gb},${bb}`
 counts.set(key, (counts.get(key) || 0) + 1)
 ```
 
