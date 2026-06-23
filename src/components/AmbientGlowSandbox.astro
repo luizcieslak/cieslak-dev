@@ -26,7 +26,7 @@ const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbo
 		</label>
 
 		<!-- curated controls -->
-		<div class='ambient-glow-sandbox-controls grid gap-2'>
+		<div class='ambient-glow-sandbox-controls grid gap-x-2 sm:gap-y-2'>
 			<!-- populated via data-* attributes; see <script> below -->
 		</div>
 
@@ -37,7 +37,7 @@ const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbo
 		>
 			Show advanced options
 		</button>
-		<div class='ambient-glow-sandbox-advanced hidden grid gap-2'>
+		<div class='ambient-glow-sandbox-advanced hidden grid gap-x-2 sm:gap-y-2'>
 			<!-- populated via data-* attributes; see <script> below -->
 		</div>
 	</div>
@@ -66,18 +66,18 @@ const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbo
 	const CURATED: SliderSpec[] = [
 		{ key: 'blur', label: 'Blur', min: 0, max: 120, step: 1, default: 40 },
 		{ key: 'sizeMultiplier', label: 'Size multiplier', min: 1, max: 3, step: 0.05, default: 1.5 },
-		{ key: 'majorBlobCount', label: 'Major blob count', min: 1, max: 12, step: 1, default: 5 },
-		{ key: 'majorBlobOpacity', label: 'Major blob opacity', min: 0, max: 1, step: 0.01, default: 0.78 },
 		{ key: 'majorBlobRadius', label: 'Major blob radius', min: 5, max: 60, step: 1, default: 28 },
-		{ key: 'jitter', label: 'Jitter', min: 0, max: 50, step: 1, default: 18 },
-		{ key: 'horizontalStretch', label: 'Horizontal stretch', min: 0.5, max: 2.5, step: 0.05, default: 1.35 },
-		{ key: 'verticalStretch', label: 'Vertical stretch', min: 0.5, max: 2.5, step: 0.05, default: 1.1 },
+		{ key: 'gridSize', label: 'Grid size', min: 2, max: 8, step: 1, default: 4 },
+		{ key: 'binSize', label: 'Color bin size', min: 4, max: 128, step: 4, default: 32 },
 	]
 
 	const ADVANCED_SLIDERS: SliderSpec[] = [
-		{ key: 'gridSize', label: 'Grid size', min: 2, max: 8, step: 1, default: 4 },
+		{ key: 'majorBlobCount', label: 'Major blob count', min: 1, max: 12, step: 1, default: 5 },
+		{ key: 'majorBlobOpacity', label: 'Major blob opacity', min: 0, max: 1, step: 0.01, default: 0.78 },
+		{ key: 'jitter', label: 'Jitter', min: 0, max: 50, step: 1, default: 18 },
+		{ key: 'horizontalStretch', label: 'Horizontal stretch', min: 0.5, max: 2.5, step: 0.05, default: 1.35 },
+		{ key: 'verticalStretch', label: 'Vertical stretch', min: 0.5, max: 2.5, step: 0.05, default: 1.1 },
 		{ key: 'fadeMs', label: 'Fade (ms)', min: 0, max: 3000, step: 50, default: 1000 },
-		{ key: 'binSize', label: 'Color bin size', min: 4, max: 128, step: 4, default: 32 },
 		{ key: 'blackThreshold', label: 'Black threshold', min: 0, max: 100, step: 1, default: 20 },
 		{ key: 'whiteThreshold', label: 'White threshold', min: 150, max: 255, step: 1, default: 235 },
 		{ key: 'majorBlobFeather', label: 'Major blob feather', min: 20, max: 100, step: 1, default: 66 },
@@ -95,7 +95,7 @@ const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbo
 
 	function buildSliderRow(spec: SliderSpec): HTMLElement {
 		const row = document.createElement('label')
-		row.className = 'grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 sm:flex sm:items-center'
+		row.className = 'grid grid-cols-[1fr_auto] items-center gap-x-3 sm:flex sm:items-center'
 		const pct = spec.max > spec.min ? ((spec.default - spec.min) / (spec.max - spec.min)) * 100 : 50
 		row.innerHTML = `
 			<span class="opacity-80 sm:w-32 sm:shrink-0">${spec.label}</span>
