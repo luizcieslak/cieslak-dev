@@ -8,7 +8,10 @@ interface Props {
 	defaultAlt?: string
 }
 
-const { defaultImage = '/lofi-radio/lofi.png', defaultAlt = 'Ambient glow sandbox preview' } = Astro.props
+const {
+	defaultImage = '/lofi-radio/glow-demo/Well Known Place.jpg',
+	defaultAlt = 'Ambient glow sandbox preview',
+} = Astro.props
 
 const lang = getLangFromUrl(Astro.url)
 const t = useTranslations(lang)
@@ -39,7 +42,7 @@ try {
 		class='ambient-glow-sandbox-stage relative mx-auto flex aspect-square w-full max-w-md items-center justify-center overflow-visible'
 	>
 		<img
-			class='ambient-glow-sandbox-img relative z-10 block w-auto h-[300px] rounded-md object-cover shadow-md'
+			class='ambient-glow-sandbox-img relative z-10 block w-auto h-[200px] md:h-[300px] rounded-md object-cover shadow-md'
 			src={defaultImage}
 			alt={defaultAlt}
 			crossorigin='anonymous'
