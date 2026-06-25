@@ -2,6 +2,7 @@
 title: Construindo uma rádio LoFi
 excerpt: Depois de ouvir muito LoFi por aí, decidi criar minha própria estação de rádio.
 publishDate: '2026-06-24'
+updatedDate: '2026-06-25'
 seo:
   image:
     src: '/lofi-radio/lofi.png'
@@ -79,7 +80,7 @@ A inspiração é o efeito "Ambilight" em algumas televisões da Philips, onde e
 
 ![Philips Ambilight effect](/lofi-radio/tv.png)
 
-### cores
+### Cores
 
 Primeiro de tudo, assim como a TV, precisamos saber _quais_ cores vamos mostrar no gradiente.
 
@@ -143,7 +144,7 @@ Na maioria dos áudios, temos uma taxa de amostragem de 44.1 kHz, o que signific
 
 Enfim, para que os ouvintes possam ouvir a música sem interrupções, precisamos enviar um novo _frame_ de áudio a cada 26 milissegundos e manter o servidor de _stream_ funcionando.
 
-Essa cadência de 26ms pode variar sed a taxa de amostragem mudar ou se é música é digitalizada de uma outra maneira. Esse número da cadência **precisa ser respeitado** se não a _stream_ vai sair toda cagada.
+Essa cadência de 26ms pode variar se a taxa de amostragem mudar ou se é música é digitalizada de uma outra maneira. Esse número da cadência **precisa ser respeitado** se não a _stream_ vai sair toda cagada.
 
 ## Porque não dá pra usar setTimeout
 
@@ -161,8 +162,6 @@ Então, se isso não funciona, o que fazer? Bom, precisamos implementar algo cha
 
 Ele funciona através do cálculo de quanto tempo foi gastado para transmitir o _frame_ de áudio e espera a diferença de tempo para que o total seja `26ms`:
 
-Every `26 ms` the server must hand out one MP3 frame. A naive `setTimeout` loop drifts off the grid; the clock-correcting `PreciseTimer` stays locked to it.
-
 <PreciseTimerDemo lang="pt-br" />
 
 ## No mundo real, precisamos de um buffer
@@ -170,8 +169,6 @@ Every `26 ms` the server must hand out one MP3 frame. A naive `setTimeout` loop 
 Poderíamos continuar enviandos um _frame_ de áudio a cada 26ms que isso iria funcionar na teoria. Porém o mundo real não é tão simples assim: Conexões ruins de celular, latência e CPUs lentas podem afetar a experiência da escuta e no final você acabaria com um áudio todo travado. 
 
 Para evitar esse problema, o servidor mantém uma "gordura" de _buffer_ da transmissão de áudio mais recente e repete ela no instante que um novo ouvinte se conecta, fazendo com que o decodificador tenta alguns segundos de segurança ao invés de nada.
-
-Uma stream em tempo real entrega o áudio rápido o suficiente para tocá-lo — _nunca_ mais rápido. A mesma rede instável alimenta os dois medidores; a única diferença é quanto há no buffer à frente. Com quase nada no buffer, cada engasgo o esvazia e você ouve uma falha. Alguns segundos de folga — o que o `burst-on-connect` instala no momento em que você conecta — absorvem os mesmos engasgos.
 
 <BufferCushionDemo lang="pt-br" />
 
