@@ -2,6 +2,7 @@
 interface Item {
 	label: string
 	done?: boolean
+	note?: string
 }
 
 interface Props {
@@ -34,10 +35,27 @@ const { items } = Astro.props
 						/>
 					</svg>
 				</span>
-				<span class:list={['leading-snug', item.done && 'opacity-60 line-through']}>
-					<Fragment set:html={item.label} />
+				<span class='leading-snug'>
+					<span class:list={[item.done && !item.note && 'opacity-60 line-through']}>
+						<Fragment set:html={item.label} />
+					</span>
+					{item.note && (
+						<span class='mt-1 block text-sm text-emerald-900 dark:text-emerald-400'>
+							<Fragment set:html={item.note} />
+						</span>
+					)}
 				</span>
 			</li>
 		))
 	}
 </ul>
+
+<style>
+	.checklist :global(a) {
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+	.checklist :global(a:hover) {
+		text-decoration-thickness: 2px;
+	}
+</style>

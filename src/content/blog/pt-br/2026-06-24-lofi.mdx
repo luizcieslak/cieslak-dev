@@ -203,7 +203,14 @@ O dahora do Shelf é que, após sincronizar todas as plataformas, a gestão da p
 <Checklist
 	items={[
 		{ label: 'Primeiro aviso para remover a rádio do ar por direitos autorais?' },
-		{ label: 'Normalizar os arquivos MP3 no servidor, todos em 44.1kHz bitrate. Talvez normalizar o volume de todas as músicas também?' },
+		{
+			label: 'Normalizar os arquivos MP3 no servidor, todos em 44.1kHz bitrate.',
+			done: true,
+			note: '<strong>Feito:</strong> O processo de upload passa agora por uma recodificação. Commit <a href="https://github.com/luizcieslak/lofi-radio/commit/810bc0c22ccffd04eaf79a7ea180d33bb8b7b39a">aqui</a>.',
+		},
+		{
+			label: 'Normalizar o volume de todas as músicas e revisar ordem',
+		},
 		{
 			label: 'Aumentar a segurança da parte de Admin do servidor para ser mais que apenas uma <em>secret string</em>',
 		},
