@@ -53,7 +53,7 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		events: null,
 	}
 
-	audio.volume = 0.5
+	audio.volume = 0.45
 	audio.preload = 'none'
 
 	// Per-tab id so the server dedupes our reconnects and counts us as one listener.
