@@ -2,7 +2,7 @@
 title: Building a LoFi radio
 excerpt: After listening to LoFi for quite some time, I decided to build my own radio station.
 publishDate: '2026-06-24'
-updatedDate: '2026-06-25'
+updatedDate: '2026-06-27'
 seo:
   image:
     src: '/lofi-radio/lofi.png'
@@ -208,7 +208,10 @@ The cool thing about Shelf is that, after we sync the playlists between all plat
 			done: true,
 			note: '<strong>Done:</strong> upload endpoint re-encodes the files. Commit <a href="https://github.com/luizcieslak/lofi-radio/commit/810bc0c22ccffd04eaf79a7ea180d33bb8b7b39a">here</a>.',
 		},
-		{ label: 'Normapize tracks volume and revise the playlist order' },
+		{ label: 'Normalize tracks volume',
+			done: true,
+			note: '<strong>Done:</strong> upload endpoint also apply a volume re-encoding if necessary. Stream feels way nicer. Commit <a href="https://github.com/luizcieslak/lofi-radio/commit/3dde231020efec11bc6cee46f5e4c4f751092261">here</a>.',
+		},
 		{ label: 'Strengthen the Admin UI in the server to be more than just a simple secret' },
 		{
 			label: 'Open up a YouTube live video streaming the radio, perhaps even with a comissioned (make by a real human) art.',
