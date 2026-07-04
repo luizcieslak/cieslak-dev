@@ -28,10 +28,12 @@ type Internal = {
 	reconnectTimer: ReturnType<typeof setTimeout> | null
 	wakeLock: WakeLockSentinel | null
 	events: EventSource | null
+	heartbeatTimer: ReturnType<typeof setInterval> | null
 }
 
 const BASE_BACKOFF_MS = 1000
 const MAX_BACKOFF_MS = 30000
+const HEARTBEAT_INTERVAL_MS = 60_000
 
 declare global {
 	interface Window {
@@ -51,17 +53,16 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		reconnectTimer: null,
 		wakeLock: null,
 		events: null,
+		heartbeatTimer: null,
 	}
 
 	audio.volume = 0.45
 	audio.preload = 'none'
 
-	// Per-tab id so the server dedupes our reconnects and counts us as one listener.
-	let sessionId = sessionStorage.getItem('radio_session_id')
-	if (!sessionId) {
-		sessionId = crypto.randomUUID()
-		sessionStorage.setItem('radio_session_id', sessionId)
-	}
+	// Per-page-lifetime id so duplicated tabs cannot inherit the same sessionStorage
+	// value and fight over one listener slot. Astro client-side navigation keeps
+	// this singleton alive, so the id still survives normal in-site navigation.
+	const sessionId = crypto.randomUUID()
 
 	const emit = () => {
 		const snapshot = { ...internal.state }
@@ -73,6 +74,34 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		internal.state = { ...internal.state, track }
 		updateMediaSession(track)
 		emit()
+	}
+
+	const listenerUrl = (action: 'heartbeat' | 'end') => {
+		return `${internal.api}/api/listeners/${action}?sid=${encodeURIComponent(sessionId)}`
+	}
+
+	const sendHeartbeat = () => {
+		fetch(listenerUrl('heartbeat'), { method: 'POST', keepalive: true }).catch(() => {})
+	}
+
+	const sendEnd = () => {
+		const url = listenerUrl('end')
+		if (navigator.sendBeacon?.(url)) return
+		fetch(url, { method: 'POST', keepalive: true }).catch(() => {})
+	}
+
+	const startHeartbeat = () => {
+		if (internal.heartbeatTimer) return
+		sendHeartbeat()
+		internal.heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS)
+	}
+
+	const stopHeartbeat = (notifyServer: boolean) => {
+		if (internal.heartbeatTimer) {
+			clearInterval(internal.heartbeatTimer)
+			internal.heartbeatTimer = null
+		}
+		if (notifyServer) sendEnd()
 	}
 
 	const updateMediaSession = (track: RadioTrack) => {
@@ -116,7 +145,7 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 			internal.reconnectTimer = null
 		}
 		console.warn(`[radio] connect() attempt=${internal.reconnectAttempt}`)
-		audio.src = internal.api + '/stream?sid=' + sessionId + '&t=' + Date.now()
+		audio.src = internal.api + '/stream?sid=' + sessionId + '&hb=1&t=' + Date.now()
 		audio.play().catch(err => {
 			console.warn('[radio] play() rejected', err && err.name, err && err.message)
 			scheduleReconnect()
@@ -137,6 +166,7 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 			internal.reconnectTimer = null
 		}
 		internal.reconnectAttempt = 0
+		stopHeartbeat(true)
 		void releaseWakeLock()
 		audio.pause()
 		audio.removeAttribute('src')
@@ -152,6 +182,7 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 			internal.state = { ...internal.state, wantPlaying: true, hasInteracted: true }
 			void requestWakeLock()
 			connect()
+			startHeartbeat()
 			emit()
 			return
 		}
@@ -230,6 +261,16 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		if (internal.state.wantPlaying && document.visibilityState === 'visible') {
 			void requestWakeLock()
 		}
+	})
+
+	window.addEventListener('pagehide', () => {
+		if (internal.state.wantPlaying) stopHeartbeat(true)
+	})
+
+	window.addEventListener('pageshow', () => {
+		if (!internal.state.wantPlaying) return
+		connect()
+		startHeartbeat()
 	})
 
 	if ('mediaSession' in navigator) {
