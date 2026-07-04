@@ -13,6 +13,8 @@ const labels = {
 	play: t('radio.play'),
 	pause: t('radio.pause'),
 	coverSuffix: t('radio.coverSuffix'),
+	listenerOne: t('radio.listenerCount.one'),
+	listenerMany: t('radio.listenerCount.many'),
 }
 
 const playlistOn = t('radio.playlistOn')
@@ -94,6 +96,18 @@ const platforms = [
 	</div>
 
 	<section aria-label={playlistOn} class='flex flex-col items-center justify-center px-4 py-10'>
+		<div
+			id='radio-listener-count'
+			data-label-one={labels.listenerOne}
+			data-label-many={labels.listenerMany}
+			aria-live='polite'
+			aria-hidden='true'
+			class='mb-8 inline-flex items-center gap-2 text-sm font-medium text-main opacity-0 transition-opacity duration-300 sm:text-base'
+		>
+			<span class='h-2 w-2 rounded-full bg-current animate-pulse' aria-hidden='true'></span>
+			<span id='radio-listener-count-text'></span>
+		</div>
+
 		<div class='flex items-center justify-center gap-10 sm:gap-14'>
 			{
 				platforms.map(platform => (
@@ -142,6 +156,24 @@ const platforms = [
 		import { mount } from '../../lib/ambient-glow'
 
 		const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
+		const LISTENER_COUNT_POLL_INTERVAL_MS = 15000
+
+		function getStatusUrl(api: string | undefined) {
+			if (!api) return null
+
+			try {
+				return new URL('/status', api).toString()
+			} catch {
+				return null
+			}
+		}
+
+		function getListenerCountFromStatus(status: unknown) {
+			if (typeof status !== 'object' || status === null || !('listenerCount' in status)) return null
+
+			const count = status.listenerCount
+			return typeof count === 'number' && Number.isFinite(count) ? Math.max(0, Math.floor(count)) : null
+		}
 
 		document.addEventListener('astro:page-load', () => {
 			const root = document.getElementById('radio-page-root')
@@ -151,6 +183,11 @@ const platforms = [
 			const labelPlay = root.dataset.labelPlay || 'Play'
 			const labelPause = root.dataset.labelPause || 'Pause'
 			const labelCoverSuffix = root.dataset.labelCoverSuffix || ''
+
+			const listenerCountEl = document.getElementById('radio-listener-count')
+			const listenerCountTextEl = document.getElementById('radio-listener-count-text')
+			const listenerLabelOne = listenerCountEl?.dataset.labelOne || 'listener'
+			const listenerLabelMany = listenerCountEl?.dataset.labelMany || 'listeners'
 
 			const player = getRadioPlayer(audio, RADIO_API)
 
@@ -188,6 +225,38 @@ const platforms = [
 
 			const controller = new AbortController()
 			const { signal } = controller
+			let listenerCountTimer: ReturnType<typeof setInterval> | null = null
+
+			const statusUrl = getStatusUrl(RADIO_API)
+			function renderListenerCount(count: number) {
+				if (!listenerCountEl || !listenerCountTextEl) return
+
+				const label = count === 1 ? listenerLabelOne : listenerLabelMany
+				listenerCountTextEl.textContent = `${count} ${label}`
+				listenerCountEl.classList.remove('opacity-0')
+				listenerCountEl.removeAttribute('aria-hidden')
+			}
+
+			async function updateListenerCount() {
+				if (!statusUrl) return
+
+				try {
+					const response = await fetch(statusUrl, { cache: 'no-store', signal })
+					if (!response.ok) return
+
+					const count = getListenerCountFromStatus(await response.json())
+					if (count === null) return
+
+					renderListenerCount(count)
+				} catch {
+					// Listener count should never break the radio page; keep the count hidden/stale.
+				}
+			}
+
+			if (listenerCountEl && listenerCountTextEl && statusUrl) {
+				updateListenerCount()
+				listenerCountTimer = setInterval(updateListenerCount, LISTENER_COUNT_POLL_INTERVAL_MS)
+			}
 
 			playBtn.addEventListener('click', () => player.toggle(), { signal })
 			coverEl.addEventListener('dblclick', () => player.toggle(), { signal })
@@ -250,6 +319,7 @@ const platforms = [
 				'astro:before-preparation',
 				() => {
 					if (controlsVisibleTimer) clearTimeout(controlsVisibleTimer)
+					if (listenerCountTimer) clearInterval(listenerCountTimer)
 					unsubscribe()
 					controller.abort()
 					glow.destroy()
