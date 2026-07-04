@@ -34,6 +34,7 @@ type Internal = {
 const BASE_BACKOFF_MS = 1000
 const MAX_BACKOFF_MS = 30000
 const HEARTBEAT_INTERVAL_MS = 60_000
+const METADATA_RESUME_REFRESH_MIN_INTERVAL_MS = 5_000
 
 declare global {
 	interface Window {
@@ -74,6 +75,39 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		internal.state = { ...internal.state, track }
 		updateMediaSession(track)
 		emit()
+	}
+
+	const refreshNowPlaying = async () => {
+		try {
+			const response = await fetch(internal.api + '/now-playing?t=' + Date.now(), { cache: 'no-store' })
+			if (!response.ok) return
+
+			const data = await response.json()
+			setTrack(data && data.track)
+		} catch {}
+	}
+
+	const connectMetadataEvents = () => {
+		internal.events?.close()
+		internal.events = new EventSource(internal.api + '/now-playing/events')
+		internal.events.onmessage = ev => {
+			try {
+				const data = JSON.parse(ev.data)
+				setTrack(data.track || data)
+			} catch {}
+		}
+	}
+
+	let lastMetadataResumeRefreshAt = 0
+	const refreshMetadataAfterResume = () => {
+		if (document.visibilityState !== 'visible') return
+
+		const now = Date.now()
+		if (now - lastMetadataResumeRefreshAt < METADATA_RESUME_REFRESH_MIN_INTERVAL_MS) return
+		lastMetadataResumeRefreshAt = now
+
+		void refreshNowPlaying()
+		connectMetadataEvents()
 	}
 
 	const listenerUrl = (action: 'heartbeat' | 'end') => {
@@ -261,13 +295,17 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		if (internal.state.wantPlaying && document.visibilityState === 'visible') {
 			void requestWakeLock()
 		}
+		refreshMetadataAfterResume()
 	})
+
+	window.addEventListener('focus', refreshMetadataAfterResume)
 
 	window.addEventListener('pagehide', () => {
 		if (internal.state.wantPlaying) stopHeartbeat(true)
 	})
 
 	window.addEventListener('pageshow', () => {
+		refreshMetadataAfterResume()
 		if (!internal.state.wantPlaying) return
 		connect()
 		startHeartbeat()
@@ -294,18 +332,8 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 
 	window.__radioPlayer = player
 
-	fetch(api + '/now-playing')
-		.then(r => r.json())
-		.then(data => setTrack(data && data.track))
-		.catch(() => {})
-
-	internal.events = new EventSource(api + '/now-playing/events')
-	internal.events.onmessage = ev => {
-		try {
-			const data = JSON.parse(ev.data)
-			setTrack(data.track || data)
-		} catch {}
-	}
+	void refreshNowPlaying()
+	connectMetadataEvents()
 
 	return player
 }
