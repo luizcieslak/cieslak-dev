@@ -95,7 +95,7 @@ The `/en/radio` and `/pt-br/radio` routes host a minimal live-stream player back
 
 ### Persistent Playback Across Navigations
 
-Playback survives client-side navigation via Astro's `<ViewTransitions />` (already mounted in [BaseLayout.astro](src/layouts/BaseLayout.astro)) plus `transition:persist` on the audio element and miniplayer. The player itself is a singleton module — [src/lib/radio-player.ts](src/lib/radio-player.ts) — that owns the audio element, SSE subscription, reconnect logic, wake lock, and media session. Three UI surfaces share that single source of truth:
+Playback survives client-side navigation via Astro's `<ViewTransitions />` (already mounted in [BaseLayout.astro](src/layouts/BaseLayout.astro)) plus `transition:persist` on the audio element and miniplayer. The player itself is a singleton module — [src/lib/radio-player.ts](src/lib/radio-player.ts) — that owns the audio element, SSE subscription, reconnect logic, listener heartbeat, wake lock, and media session. Three UI surfaces share that single source of truth:
 
 - **Full page** ([src/pages/\[lang\]/radio.astro](src/pages/%5Blang%5D/radio.astro)) — big cover with ambient glow, only on `/radio`.
 - **Miniplayer** ([src/components/RadioMiniplayer.astro](src/components/RadioMiniplayer.astro)) — slim fixed-bottom bar, mounted in BaseLayout, hidden on `/radio` and when no track is loaded. Hosts the persisted `<audio>` element.
