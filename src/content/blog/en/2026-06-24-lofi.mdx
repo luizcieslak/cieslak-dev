@@ -2,6 +2,7 @@
 title: Building a LoFi radio
 excerpt: After listening to LoFi for quite some time, I decided to build my own radio station.
 publishDate: '2026-06-24'
+updatedDate: '2026-06-27'
 seo:
   image:
     src: '/lofi-radio/lofi.png'
@@ -41,7 +42,7 @@ Before continuing reading, what if we listen to the music together? Just press t
 	<img src="/lofi-radio/diagram-v.png" alt="Diagram of how the radio is working" />
 </picture>
 
-Below we have the diagram of how it is working right now. All the code used here is open source on this repositories:
+Above we have the diagram of how it is working right now. All the code used here is open source on this repositories:
 
 * [player](https://cieslak.dev/en/radio/): The client side consuming the audio stream and interacting with the server via HTTP requests and SSE.
 * [lofi-radio](https://github.com/luizcieslak/lofi-radio): Server aplication using Bun. Store the files, streams the audio and holds the Admin UI.
@@ -161,8 +162,6 @@ So if that doesn't work, what does? Well, something called `PreciseTimer` needs 
 
 Its calculated how many time it takes to broadcast the audio frame and wait the difference so it adds up to the `26ms` we need to follow:
 
-Every `26 ms` the server must hand out one MP3 frame. A naive `setTimeout` loop drifts off the grid; the clock-correcting `PreciseTimer` stays locked to it.
-
 <PreciseTimerDemo lang="en" />
 
 ## Real world needs a buffer
@@ -170,8 +169,6 @@ Every `26 ms` the server must hand out one MP3 frame. A naive `setTimeout` loop 
 We could keep sending audio frames every 26ms only and that would work in theory. But the real world is not that simple: Poor network connections, latency and slow CPUs can affect the hearing experience and you would ended up with a choppy audio.
 
 To avoid this problem, the server keeps a small ring buffer of the most recently broadcast frames and replays it the instant a client connects, so the decoder starts with a few seconds of runway instead of nothing. 
-
-A real-time stream hands out audio just fast enough to play it — _never_ faster. The same jittery network feeds both gauges; the only difference is how much is buffered ahead. With almost nothing buffered, every hiccup drains it to empty and you hear a gap. A few seconds of cushion — what `burst-on-connect` installs the moment you connect — absorbs the same hiccups.
 
 <BufferCushionDemo lang="en" />
 
@@ -206,7 +203,15 @@ The cool thing about Shelf is that, after we sync the playlists between all plat
 <Checklist
 	items={[
 		{ label: 'First DMCA Takedown Notice?' },
-		{ label: 'Normalize the MP3 tracks in the server so they are all in 44.1kHz sampling rate' },
+		{
+			label: 'Normalize the MP3 tracks in the server so they are all in 44.1kHz sampling rate.',
+			done: true,
+			note: '<strong>Done:</strong> upload endpoint re-encodes the files. Commit <a href="https://github.com/luizcieslak/lofi-radio/commit/810bc0c22ccffd04eaf79a7ea180d33bb8b7b39a">here</a>.',
+		},
+		{ label: 'Normalize tracks volume',
+			done: true,
+			note: '<strong>Done:</strong> upload endpoint also apply a volume re-encoding if necessary. Stream feels way nicer. Commit <a href="https://github.com/luizcieslak/lofi-radio/commit/3dde231020efec11bc6cee46f5e4c4f751092261">here</a>.',
+		},
 		{ label: 'Strengthen the Admin UI in the server to be more than just a simple secret' },
 		{
 			label: 'Open up a YouTube live video streaming the radio, perhaps even with a comissioned (make by a real human) art.',

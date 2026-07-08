@@ -24,6 +24,8 @@ export const ui = {
 		'radio.volume': 'Volume',
 		'radio.coverSuffix': 'cover',
 		'radio.playlistOn': "Listen to this radio's playlist on",
+		'radio.listenerCount.one': 'listener',
+		'radio.listenerCount.many': 'listeners',
 		'glow.randomize': 'Randomize',
 	},
 	'pt-br': {
@@ -37,6 +39,8 @@ export const ui = {
 		'radio.volume': 'Volume',
 		'radio.coverSuffix': 'capa',
 		'radio.playlistOn': 'Ouça a playlist desta rádio no',
+		'radio.listenerCount.one': 'ouvinte',
+		'radio.listenerCount.many': 'ouvintes',
 		'glow.randomize': 'Aleatório',
 		// 'nav.twitter': 'Twitter',
 	},
