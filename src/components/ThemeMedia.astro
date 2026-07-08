@@ -38,23 +38,26 @@ const { light, dark, alt = '', video = false, class: className = '' } = Astro.pr
 		const isDark = document.documentElement.classList.contains('dark')
 		document.querySelectorAll<HTMLElement>('[data-light][data-dark]').forEach((el) => {
 			const next = isDark ? el.dataset.dark! : el.dataset.light!
-			const media = el as HTMLMediaElement
-			if (media.src?.endsWith(next)) return
+			// skip if already correct — a redundant .load() aborts an in-flight
+			// autoplay decode and surfaces as "media resource not suitable"
+			if (el.getAttribute('src') === next) return
 			el.setAttribute('src', next)
 			// videos need an explicit reload to decode the swapped source
 			if (el.tagName === 'VIDEO') (el as HTMLVideoElement).load()
 		})
 	}
 
+	// bind once: the inline script re-runs on every navigation, so an unguarded
+	// page-load listener would stack up and fire N times on the Nth visit
 	if (!window.__themeMediaBound) {
 		window.__themeMediaBound = true
 		new MutationObserver(syncThemeMedia).observe(document.documentElement, {
 			attributes: true,
 			attributeFilter: ['class'],
 		})
+		document.addEventListener('astro:page-load', syncThemeMedia)
 	}
 
 	// run on first load and after every ViewTransitions navigation
 	syncThemeMedia()
-	document.addEventListener('astro:page-load', syncThemeMedia)
 </script>

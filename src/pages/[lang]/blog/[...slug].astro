@@ -102,6 +102,22 @@ const { Content } = await post.render()
 
 <script>
 	document.addEventListener('astro:page-load', () => {
+		// After a ViewTransitions navigation, autoplay videos can be swapped back in
+		// with a torn-down media pipeline and land in MEDIA_ERR_SRC_NOT_SUPPORTED
+		// ("media resource … not suitable"). Recover a video by reloading it once —
+		// both if it has already errored and if it errors shortly after (the decode
+		// failure is async). Guarded so we only retry once per element.
+		document.querySelectorAll<HTMLVideoElement>('video[autoplay]').forEach((video) => {
+			const recover = () => {
+				if (video.dataset.recovered) return
+				video.dataset.recovered = '1'
+				video.load()
+				video.play().catch(() => {})
+			}
+			if (video.error) recover()
+			else video.addEventListener('error', recover, { once: true })
+		})
+
 		const copyUrlButton = document.querySelector('.copy-url-button') as HTMLButtonElement
 		copyUrlButton?.addEventListener('click', async () => {
 			await copyUrl(copyUrlButton)
