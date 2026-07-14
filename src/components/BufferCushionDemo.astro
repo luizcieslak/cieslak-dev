@@ -81,19 +81,19 @@ const strings = {
 		{
 			lang === 'en' ? (
 				<>
-					A live stream sends exactly one frame per frame-duration — it never sends faster, so a fresh
+					A live stream sends exactly one frame per frame-duration, it never sends faster. So a fresh
 					listener's buffer starts at zero and stays razor-thin. One late packet and it underruns. Replaying
 					the last few seconds of frames the instant they connect gives the decoder something to coast on. The
-					cost: that listener is now a few seconds behind the live edge — "perfect sync" becomes "perfect sync
-					within the burst window."
+					cost: that listener is now a few seconds behind the live edge — making "perfect sync" a few seconds
+					behind within an acceptable window.
 				</>
 			) : (
 				<>
-					Uma stream ao vivo envia exatamente um frame por duração de frame — nunca mais rápido, então o
-					buffer de um ouvinte novo começa em zero e fica raso demais. Um pacote atrasado e ele esvazia.
-					Reproduzir os últimos segundos de frames no instante em que ele conecta dá ao decoder uma folga para
-					deslizar. O custo: esse ouvinte fica alguns segundos atrás da borda ao vivo — a "sincronia perfeita"
-					vira "sincronia perfeita dentro da janela do burst".
+					Uma stream ao vivo envia exatamente um frame por duração de frame, nunca mais rápido. Então o buffer
+					de um ouvinte novo começa em zero e muito fino. Qualquer pacote atrasado e ele acaba. Reproduzir os
+					últimos segundos de frames no instante em que ele conecta dá ao decoder uma folga para ele crescer.
+					O custo: esse ouvinte fica alguns segundos atrás do som ao vivo, fazendo com que a "sincronia
+					perfeita" fica alguns segundos atrados, dentro de uma janela aceitável.
 				</>
 			)
 		}

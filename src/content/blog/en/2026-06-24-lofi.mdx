@@ -2,7 +2,7 @@
 title: Building a LoFi radio
 excerpt: After listening to LoFi for quite some time, I decided to build my own radio station.
 publishDate: '2026-06-24'
-updatedDate: '2026-06-27'
+updatedDate: '2026-07-14'
 seo:
   image:
     src: '/lofi-radio/lofi.png'
@@ -25,9 +25,7 @@ You have probably have seen or listened to the classic "LoFi Girl" [radio](https
 
 The stream exists [almost interruptly](https://www.theverge.com/2020/2/24/21150488/chilledcow-lofi-hiphop-livestream-youtube-termiantion-vod-anime-study-girl) since 2018. The live is still very popular, with around ~20k viewers every single day and some interacting in the chat.
 
-I like LoFi music. For me, it started as something I would put as a background music when studying at college. After graduated, I began also listening it when working. Finally, I realized I was listening to them in another ocasions as well: I started to add it in my personal playlist, then I noticed: well, I might have listened so much to it that I might have a good collection of my favourite ones and therefore I decided to share it in the wild.
-
-I started listening to the genre more or less when the graduating from college which helped me focus and study. Then, I became to also listen to it when working. After some years, I noticed I was also listening to it in another ocasions too, adding it to playlists here and there and then I realized that I might have some good collection of tracks and therefore could have my own playlist to share to the world.
+I like LoFi music. Started listening to the genre more or less when the graduating from college which helped me focus and study. Then, I became to also listen to it when working. After some years, I noticed I was also listening to it in another ocasions too, adding it to playlists here and there and then I realized that I might have some good collection of tracks that could be shared in a playlist to the world.
 
 At that point creating the playlist would be enough but as an engineer that _sometimes_ overengineer things, I decided to build a **whole radio station from scratch**. This is a blog post that goes over the whole process in depth. All the code you see here is open-source so you can create your own version if you'd like.
 
@@ -99,7 +97,7 @@ const key = `${rb},${gb},${bb}`
 counts.set(key, (counts.get(key) || 0) + 1)
 ```
 
-The bucket with the highest count wins, and its center is reconstructed back into an `{ r, g, b }` triplet. `binSize` controls how forgiving the buckets are — large bins merge close shades into one dominant color, small bins preserve fine variation at the cost of fragmenting the vote. The black/white skips exist because letterboxing and bright backgrounds otherwise dominate the count and drain the gradient of the colors that actually matter.
+The bucket with the highest count wins, and its center is reconstructed back into an `{ r, g, b }` triplet. `binSize` controls how forgiving the buckets are: large bins merge close shades into one dominant color, small bins preserve fine variation at the cost of fragmenting the vote. The black/white skips exist because letterboxing and bright backgrounds otherwise dominate the count and drain the gradient of the colors that actually matter.
 
 Here's the same algorithm running on a 4×4 grid so you can see the palette it picks:
 
