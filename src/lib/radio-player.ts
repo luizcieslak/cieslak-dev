@@ -29,11 +29,12 @@ type Internal = {
 	wakeLock: WakeLockSentinel | null
 	events: EventSource | null
 	heartbeatTimer: ReturnType<typeof setInterval> | null
+	sseHeartbeatTimer: ReturnType<typeof setInterval> | null
 }
 
 const BASE_BACKOFF_MS = 1000
 const MAX_BACKOFF_MS = 30000
-const HEARTBEAT_INTERVAL_MS = 60_000
+const HEARTBEAT_INTERVAL_MS = 150_000
 const METADATA_RESUME_REFRESH_MIN_INTERVAL_MS = 5_000
 
 declare global {
@@ -55,6 +56,7 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		wakeLock: null,
 		events: null,
 		heartbeatTimer: null,
+		sseHeartbeatTimer: null,
 	}
 
 	audio.volume = 0.45
@@ -89,13 +91,19 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 
 	const connectMetadataEvents = () => {
 		internal.events?.close()
-		internal.events = new EventSource(internal.api + '/now-playing/events')
+		// Pass the session id so the server can heartbeat-expire this SSE connection
+		// if we vanish without a clean close (mobile sleep, dropped TCP). Without it,
+		// silently-dropped SSE sockets leak on the server for ~11 min (OS keepalive).
+		internal.events = new EventSource(
+			internal.api + '/now-playing/events?sid=' + encodeURIComponent(sessionId),
+		)
 		internal.events.onmessage = ev => {
 			try {
 				const data = JSON.parse(ev.data)
 				setTrack(data.track || data)
 			} catch {}
 		}
+		startSSEHeartbeat()
 	}
 
 	let lastMetadataResumeRefreshAt = 0
@@ -116,6 +124,19 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 
 	const sendHeartbeat = () => {
 		fetch(listenerUrl('heartbeat'), { method: 'POST', keepalive: true }).catch(() => {})
+	}
+
+	// The metadata SSE is open for the whole page lifetime (even before play), so it
+	// needs its own heartbeat, separate from the play-gated listener heartbeat above.
+	const sendSSEHeartbeat = () => {
+		const url = `${internal.api}/api/sse/heartbeat?sid=${encodeURIComponent(sessionId)}`
+		fetch(url, { method: 'POST', keepalive: true }).catch(() => {})
+	}
+
+	const startSSEHeartbeat = () => {
+		if (internal.sseHeartbeatTimer) return
+		sendSSEHeartbeat()
+		internal.sseHeartbeatTimer = setInterval(sendSSEHeartbeat, HEARTBEAT_INTERVAL_MS)
 	}
 
 	const sendEnd = () => {
