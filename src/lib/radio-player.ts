@@ -209,6 +209,11 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 
 	const scheduleReconnect = () => {
 		if (!internal.state.wantPlaying || internal.reconnectTimer) return
+		// While the tab is hidden the browser throttles the backgrounded <audio>
+		// element and drains its shallow live-edge buffer, so reconnecting now just
+		// re-drains and loops. Suspend reconnects until the tab is visible again;
+		// the visibilitychange handler does one clean reconnect on resume.
+		if (document.visibilityState === 'hidden') return
 		const delay = Math.min(BASE_BACKOFF_MS * Math.pow(1.5, internal.reconnectAttempt), MAX_BACKOFF_MS)
 		internal.reconnectAttempt++
 		internal.reconnectTimer = setTimeout(connect, delay)
@@ -302,6 +307,10 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 			if (++stalledTicks >= 3) {
 				// ~6s of no progress
 				stalledTicks = 0
+				// A hidden tab stalls because the browser throttled it, not because
+				// the stream died — reconnecting now would loop. Let it sit; the
+				// visibilitychange handler reconnects once on resume.
+				if (document.visibilityState === 'hidden') return
 				logReconnect('watchdog-stall')
 				connect()
 			}
@@ -313,8 +322,27 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 	}, 2000)
 
 	document.addEventListener('visibilitychange', () => {
-		if (internal.state.wantPlaying && document.visibilityState === 'visible') {
+		if (document.visibilityState === 'hidden') {
+			// Going hidden: cancel any pending reconnect and reset backoff so we
+			// don't churn while backgrounded. We keep wantPlaying true and leave the
+			// (soon-to-stall) stream as-is; resume happens when we become visible.
+			if (internal.reconnectTimer) {
+				clearTimeout(internal.reconnectTimer)
+				internal.reconnectTimer = null
+			}
+			internal.reconnectAttempt = 0
+			return
+		}
+
+		// Becoming visible again.
+		if (internal.state.wantPlaying) {
 			void requestWakeLock()
+			// The backgrounded stream almost certainly stalled/dropped. If the audio
+			// isn't actively progressing, do exactly one clean reconnect to resume.
+			if (audio.paused || audio.readyState < 3) {
+				internal.reconnectAttempt = 0
+				connect()
+			}
 		}
 		refreshMetadataAfterResume()
 	})
