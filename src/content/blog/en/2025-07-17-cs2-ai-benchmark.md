@@ -4,6 +4,8 @@ excerpt: This is a benchmark of different LLM models that predict matches of Cou
 publishDate: '2025-07-17'
 updatedDate: '2025-07-17'
 seo:
+  title: CS2 Match Prediction — AI Model Benchmark
+  description: A benchmark of different AI models predicting Counter-Strike 2 matches at the 2025 Austin Major — which model called the most games, and by what margin.
   image:
     src: '/cs2-benchmark/overall-performance.png'
     alt: Average team advancement prediction accuracy across all stages

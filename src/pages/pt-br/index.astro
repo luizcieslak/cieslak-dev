@@ -6,7 +6,9 @@ import Hero from '../../components/Hero.astro'
 import PostPreview from '../../components/PostPreview.astro'
 import siteConfig from '../../data/site-config'
 import { sortItemsByDateDesc } from '../../utils/data-utils'
+import { getLangFromUrl, useTranslations } from '../../i18n/utils'
 
+const t = useTranslations(getLangFromUrl(Astro.url))
 const locale = Astro.currentLocale ?? 'pt-br'
 const posts = (await getCollection('blog'))
 	.sort(sortItemsByDateDesc)
@@ -14,7 +16,7 @@ const posts = (await getCollection('blog'))
 // const featuredPosts = posts.filter(({ data }) => data.isFeatured)
 ---
 
-<BaseLayout description={siteConfig.description} image={siteConfig.image}>
+<BaseLayout title={t('site.title')} description={t('site.description')} image={siteConfig.image}>
 	<Hero />
 	{
 		posts?.length > 0 && (

@@ -16,7 +16,11 @@ export default defineConfig({
 	},
 	integrations: [
 		mdx(),
-		sitemap(),
+		// `/` is a `<meta http-equiv="refresh">` stub that bounces visitors to a
+		// language (src/pages/index.astro) — it has no title or description to index,
+		// so don't advertise it as a real page. Compare on pathname, not the full URL,
+		// so this keeps working if `site` above ever changes.
+		sitemap({ filter: page => new URL(page).pathname !== '/' }),
 		tailwind({
 			applyBaseStyles: false,
 		}),

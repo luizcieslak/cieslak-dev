@@ -5,7 +5,8 @@
 	"scripts": {
 		"dev": "astro dev",
 		"start": "astro dev",
-		"build": "astro check && astro build",
+		"build": "astro check && astro build && node scripts/check-meta.mjs",
+		"check:meta": "node scripts/check-meta.mjs",
 		"preview": "astro preview",
 		"astro": "astro",
 		"format": "npx prettier --write ."

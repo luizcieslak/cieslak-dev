@@ -4,6 +4,8 @@ excerpt: Um Benchmark de diferentes modelos de IA que preveem partidas de Counte
 publishDate: '2025-07-17'
 updatedDate: '2025-07-17'
 seo:
+  title: Previsão de CS2 — comparativo entre modelos de IA
+  description: Um benchmark de diferentes modelos de IA prevendo partidas de Counter-Strike 2 no Major de Austin em 2025 — qual modelo acertou mais, e por qual margem.
   image:
     src: '/cs2-benchmark/overall-performance.png'
     alt: Média da precisão no avanço de equipes entre as fases do campeonato

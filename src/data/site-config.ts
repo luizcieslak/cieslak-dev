@@ -30,7 +30,11 @@ export type SiteConfig = {
 
 const siteConfig: SiteConfig = {
 	title: 'Cieslak.dev',
-	description: 'Luiz Cieslak website',
+	// The RSS channel description (src/pages/rss.xml.js) — its only consumer. Page
+	// meta descriptions are per-language and live in src/i18n/ui.ts (`site.description`)
+	// or in each entry's `seo.description`; these two are deliberately separate.
+	description:
+		'Luiz Cieslak, a software engineer in São Paulo writing about the web, AI experiments, and the side projects he builds.',
 	image: {
 		src: '/cieslak-dev-preview.png',
 		alt: 'Luiz Cieslak happily hugging an Android mascot.',

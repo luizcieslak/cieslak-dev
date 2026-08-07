@@ -5,12 +5,19 @@ import '../styles/global.css'
 
 export type Props = {
 	title?: string
-	description?: string
+	/**
+	 * Required on purpose. This used to default to '', which meant a page that
+	 * forgot to pass one silently shipped an empty <meta name="description"> —
+	 * how most of the site ended up flagged by Bing. A generic fallback would
+	 * only trade the empty tag for a duplicate one, so callers must supply it and
+	 * `astro check` fails when they don't.
+	 */
+	description: string
 	image?: { src: string; alt?: string }
 	pageType?: 'website' | 'article'
 }
 
-const { description = '', image = siteConfig.image, pageType = 'website' } = Astro.props
+const { description, image = siteConfig.image, pageType = 'website' } = Astro.props
 const title = [Astro.props.title, siteConfig.title].filter(Boolean).join(' | ')
 const resolvedImage = image?.src
 	? {
@@ -34,10 +41,7 @@ function getLangAlternates(url: URL) {
 		return { url: formatCanonicalURL(`${url.origin}/${lang}/${slugPath}`), hreflang: lang }
 	})
 
-	return [
-		...alternates,
-		{ url: formatCanonicalURL(`${url.origin}/en/${slugPath}`), hreflang: 'x-default' },
-	]
+	return [...alternates, { url: formatCanonicalURL(`${url.origin}/en/${slugPath}`), hreflang: 'x-default' }]
 }
 
 /**
