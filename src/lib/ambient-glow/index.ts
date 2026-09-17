@@ -21,6 +21,15 @@ export interface GlowOptions {
 	sideBloomCount?: number
 	sideBloomOpacity?: number
 	sideBloomRadius?: number
+	/**
+	 * Per-blob drift amplitude, in the same percentage units as `jitter`. 0 (the
+	 * default) disables the animation entirely and renders exactly as before.
+	 * Only used for recording promo videos — see docs/video-recording.md in the
+	 * lofi-radio repo. Not enabled on any production surface.
+	 */
+	drift?: number
+	/** Time multiplier for `drift`. 1 is a slow breathing drift. */
+	driftSpeed?: number
 }
 
 export interface Rgb {
@@ -31,6 +40,12 @@ export interface Rgb {
 
 export interface GlowHandle {
 	setOptions(patch: Partial<GlowOptions>): void
+	/**
+	 * Start/stop the drift animation. Deliberately NOT driven by `setOptions`:
+	 * the sandboxes call that on every slider tick, which would fight the loop
+	 * for the layer it repaints.
+	 */
+	setDrift(enabled: boolean): void
 	update(): void
 	getColors(): Array<Rgb | null>
 	destroy(): void
@@ -68,6 +83,8 @@ const DEFAULTS: Required<GlowOptions> = {
 	sideBloomCount: 2,
 	sideBloomOpacity: 0.32,
 	sideBloomRadius: 42,
+	drift: 0,
+	driftSpeed: 1,
 }
 
 export function extractColors(img: HTMLImageElement, userOptions: GlowOptions = {}): Array<Rgb | null> {
@@ -78,6 +95,12 @@ export function extractColors(img: HTMLImageElement, userOptions: GlowOptions = 
 	return extractImageColors(img, opts, canvas, ctx)
 }
 
+// ~24fps. Each drift frame rebuilds a multi-stop radial-gradient string and
+// repaints a heavily blurred layer, so the blur pass — not the string build — is
+// the dominant cost. At a sub-pixel-per-frame drift on a blurred backdrop, 24fps
+// is indistinguishable from 60 and buys real headroom at 1080x1920.
+const DRIFT_FRAME_MS = 1000 / 24
+
 export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): GlowHandle {
 	const parent = img.parentElement
 	if (!parent) throw new Error('ambient-glow: img must be attached to the DOM before mount()')
@@ -86,6 +109,15 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 	let lastColors: Array<Rgb | null> = []
 	let activeKey: 'a' | 'b' = 'a'
 	let hasApplied = false
+	// The layer currently faded IN. `activeKey` can't serve this purpose: apply()
+	// writes to the layer that is *not* activeKey and only flips afterwards, so
+	// activeKey names the visible layer only between flips. The drift loop needs
+	// an unambiguous answer on every frame, including mid-apply.
+	let visibleLayer: HTMLDivElement | null = null
+	let driftFrame: number | null = null
+	let driftOrigin = 0
+	let lastDriftPaint = -Infinity
+	let destroyed = false
 
 	const layerA = createLayer(options)
 	const layerB = createLayer(options)
@@ -122,7 +154,12 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 	}
 
 	function apply(colors: Array<Rgb | null>) {
-		const gradient = buildGradient(colors, options)
+		// Paint at the CURRENT drift phase, not phase 0. A track change while
+		// drifting crossfades to the other layer, and that layer has to come in
+		// already at the phase the drift loop is about to keep painting — otherwise
+		// it fades in at the phase-0 positions and snaps on the next drift frame,
+		// a visible jump exactly at the crossfade.
+		const gradient = buildGradient(colors, options, currentPhase())
 		const next = activeKey === 'a' ? layerB : layerA
 		const prev = activeKey === 'a' ? layerA : layerB
 		next.style.background = gradient
@@ -135,9 +172,61 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		next.style.opacity = '0.8'
 		prev.style.opacity = '0'
 		activeKey = activeKey === 'a' ? 'b' : 'a'
+		visibleLayer = next
+		// Yield the incoming layer past THIS frame batch: both this and driftTick run
+		// from rAF, so otherwise they can land in the same batch and drift would
+		// immediately overwrite the gradient apply() just faded in.
+		//
+		// Capped at half an interval rather than a full one so repeated applies can't
+		// compound into starving drift entirely. That matters if a consumer ever
+		// drives setOptions per frame (the sandbox's coalesced slider drag) with
+		// drift on: a full-interval stamp at >24Hz would silently mean zero drift
+		// frames for the whole drag. No consumer does both today.
+		lastDriftPaint = Math.max(lastDriftPaint, performance.now() - DRIFT_FRAME_MS / 2)
+	}
+
+	function currentPhase() {
+		return driftFrame === null ? 0 : (performance.now() - driftOrigin) / 1000
+	}
+
+	function driftTick(now: number) {
+		driftFrame = requestAnimationFrame(driftTick)
+		if (now - lastDriftPaint < DRIFT_FRAME_MS) return
+		lastDriftPaint = now
+		// No-op until at least one apply() has landed: before that there is no
+		// visible layer, and writing a background would race the first-reflow.
+		if (!visibleLayer || lastColors.length === 0) return
+		// Read visibleLayer/lastColors fresh each frame so a track change (which
+		// re-extracts and crossfades to the other layer) is picked up on the next
+		// frame. `phase` deliberately runs continuously across track changes —
+		// resetting it would jump every blob at the exact moment of the crossfade.
+		visibleLayer.style.background = buildGradient(lastColors, options, (now - driftOrigin) / 1000)
+	}
+
+	function stopDrift() {
+		if (driftFrame === null) return
+		cancelAnimationFrame(driftFrame)
+		driftFrame = null
 	}
 
 	return {
+		setDrift(enabled) {
+			if (!enabled) {
+				stopDrift()
+				return
+			}
+			if (destroyed || driftFrame !== null) return
+			// Checked once, not per frame. A recording-only feature doesn't need to
+			// react to the setting changing mid-capture. Fails CLOSED: an environment
+			// without matchMedia can't tell us motion is wanted, so we don't animate.
+			if (typeof window.matchMedia !== 'function') return
+			if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+			driftOrigin = performance.now()
+			// Sentinel, not a timestamp: `now - -Infinity` is always past the throttle,
+			// so the first frame paints regardless of how long the page has been open.
+			lastDriftPaint = -Infinity
+			driftFrame = requestAnimationFrame(driftTick)
+		},
 		setOptions(patch) {
 			options = { ...options, ...patch }
 			styleLayer(layerA, options)
@@ -153,6 +242,11 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		},
 		destroy() {
 			img.removeEventListener('load', onLoad)
+			destroyed = true
+			stopDrift()
+			// Dropped so a later setDrift(true) can't restart the loop against the
+			// detached layers below — the handle has to be genuinely inert after this.
+			visibleLayer = null
 			if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
 			layerA.remove()
 			layerB.remove()
@@ -259,7 +353,49 @@ function dominantColor(
 	return { r: br * binSize, g: bg * binSize, b: bb * binSize }
 }
 
-function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): string {
+/**
+ * Per-blob drift offset. The frequencies and phase offsets are seeded (so each
+ * blob keeps its own stable, independent motion), but the time term is
+ * continuous — so blobs drift smoothly instead of re-rolling discontinuously
+ * the way changing `jitter` would.
+ *
+ * `drift: 0` renders byte-identically to the pre-drift version. That rests on
+ * `randomBetween` being a pure function of its seed — there is no PRNG stream to
+ * advance — so a drift-side draw can never perturb a static one, and on
+ * `x + 0 === x`. (Exact cancellation to `-0`, the one value that would break it,
+ * isn't reachable here: round-to-nearest gives `+0`.)
+ *
+ * DRIFT_SALT keeps drift draws clear of the static ones for legibility, NOT for
+ * correctness — `colorSeed` is linear, so at fine `binSize` the salt spaces do
+ * collide. A collision only means two independent reads are correlated, which at
+ * `drift: 0` are never consumed. Don't treat this constant as load-bearing.
+ */
+const DRIFT_SALT = 401
+
+function driftOffset(color: Rgb, index: number, phase: number, amplitude: number) {
+	// Written as `!(amplitude > 0)` so NaN and negatives fall back to static too,
+	// rather than emitting `NaN%` into the CSS. `Infinity` is excluded for the same
+	// reason: `Infinity * 0` in the offset math is NaN.
+	// At 0 this is a fast path rather than a correctness guard — `Math.sin(...) * 0`
+	// is already `±0` and `x + ±0 === x` — but it matters for cost, since
+	// buildGradient runs on every apply() for the consumers that never set `drift`.
+	// `phase` is guarded alongside it: driftSpeed multiplies into it upstream, so a
+	// non-finite speed would otherwise slip past the amplitude check.
+	if (!(amplitude > 0) || !Number.isFinite(amplitude) || !Number.isFinite(phase)) return { x: 0, y: 0 }
+	const seed = colorSeed(color, index + DRIFT_SALT)
+	// Incommensurate frequencies, so a blob's path never visibly repeats within
+	// the ~60s of a promo clip.
+	const fx = randomBetween(seed, 0.031, 0.073)
+	const fy = randomBetween(seed + 1, 0.037, 0.089)
+	const px = randomBetween(seed + 2, 0, Math.PI * 2)
+	const py = randomBetween(seed + 3, 0, Math.PI * 2)
+	return {
+		x: Math.sin(phase * fx * Math.PI * 2 + px) * amplitude,
+		y: Math.cos(phase * fy * Math.PI * 2 + py) * amplitude * 0.6,
+	}
+}
+
+function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>, phase = 0): string {
 	const weighted = colors
 		.map((color, index) => {
 			if (!color) return null
@@ -276,16 +412,24 @@ function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): 
 	if (weighted.length === 0) return 'none'
 
 	const parts: string[] = []
+	// Resolved once. `driftSpeed` falls back to 1 rather than riding along as
+	// undefined, so a partially-built options object degrades to unscaled drift
+	// instead of silently killing all motion.
+	const driftPhase = phase * (Number.isFinite(opts.driftSpeed) ? opts.driftSpeed : 1)
 	const major = weighted.slice(0, opts.majorBlobCount)
 	for (const entry of major) {
 		const seed = colorSeed(entry.color, entry.index)
+		const drift = driftOffset(entry.color, entry.index, driftPhase, opts.drift)
 		const x = clamp(
-			50 + entry.centeredX * (24 * opts.horizontalStretch) + randomBetween(seed, -opts.jitter, opts.jitter),
+			50 +
+				entry.centeredX * (24 * opts.horizontalStretch) +
+				randomBetween(seed, -opts.jitter, opts.jitter) +
+				drift.x,
 			-opts.edgeBleed,
 			100 + opts.edgeBleed,
 		)
 		const y = clamp(
-			50 + entry.centeredY * 24 + randomBetween(seed + 1, -opts.jitter * 0.6, opts.jitter * 0.6),
+			50 + entry.centeredY * 24 + randomBetween(seed + 1, -opts.jitter * 0.6, opts.jitter * 0.6) + drift.y,
 			-12,
 			112,
 		)
@@ -304,7 +448,8 @@ function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): 
 		const side = i % 2 === 0 ? -1 : 1
 		const x =
 			side < 0 ? randomBetween(seed, -opts.edgeBleed, 14) : randomBetween(seed, 86, 100 + opts.edgeBleed)
-		const y = clamp(50 + entry.centeredY * 18 + randomBetween(seed + 1, -10, 10), 4, 96)
+		const bloomDrift = driftOffset(entry.color, entry.index + 91, driftPhase, opts.drift * 0.5)
+		const y = clamp(50 + entry.centeredY * 18 + randomBetween(seed + 1, -10, 10) + bloomDrift.y, 4, 96)
 		const radiusX = opts.sideBloomRadius * randomBetween(seed + 2, 1.2, 1.8) * opts.horizontalStretch
 		const radiusY = opts.sideBloomRadius * randomBetween(seed + 3, 0.75, 1.15) * opts.verticalStretch
 		const opacity = clamp(opts.sideBloomOpacity * randomBetween(seed + 4, 0.8, 1.1), 0.08, 0.5)

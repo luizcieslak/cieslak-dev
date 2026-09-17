@@ -48,7 +48,7 @@ const platforms = [
 					src=''
 					alt=''
 					crossorigin='anonymous'
-					class='relative z-[2] h-auto aspect-square w-[min(78vw,420px)] object-cover rounded shadow-lg opacity-0 transition-opacity duration-500'
+					class='relative z-[2] h-auto aspect-square w-[min(78vw,360px)] object-cover rounded shadow-lg opacity-0 transition-opacity duration-500'
 				/>
 				<button
 					id='radio-play'
@@ -297,7 +297,25 @@ const platforms = [
 				iconPause.classList.toggle('hidden', !showingPlaying)
 			})
 
+			// Recording-only: `?drift=8` on /radio/ makes the ambient glow drift slowly
+			// instead of sitting still, for the promo clips described in
+			// docs/video-recording.md (lofi-radio repo). Off unless the param is
+			// present, so normal visitors get the static glow exactly as before.
+			// `?driftSpeed=` scales the pace independently: drift is how FAR blobs
+			// travel, driftSpeed is how FAST. Query params rather than constants so
+			// both can be tuned from the URL bar while a track is on the air,
+			// without an edit/HMR cycle.
+			const params = new URLSearchParams(location.search)
+			const positiveParam = (name: string, fallback: number) => {
+				const value = Number(params.get(name))
+				return Number.isFinite(value) && value > 0 ? value : fallback
+			}
+			const drift = positiveParam('drift', 0)
+			const driftSpeed = positiveParam('driftSpeed', 1)
+
 			const glow = mount(coverEl, {
+				drift,
+				driftSpeed,
 				binSize: 64,
 				gridSize: 5,
 				blur: 56,
@@ -314,6 +332,8 @@ const platforms = [
 				sideBloomOpacity: 0.34,
 				sideBloomRadius: 48,
 			})
+
+			if (drift > 0) glow.setDrift(true)
 
 			document.addEventListener(
 				'astro:before-preparation',
