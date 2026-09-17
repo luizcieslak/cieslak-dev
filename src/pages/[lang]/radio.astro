@@ -48,7 +48,7 @@ const platforms = [
 					src=''
 					alt=''
 					crossorigin='anonymous'
-					class='relative z-[2] h-auto aspect-square w-[min(78vw,360px)] object-cover rounded shadow-lg opacity-0 transition-opacity duration-500'
+					class='relative z-[2] h-auto aspect-square w-[min(78vw,60vw)] object-cover rounded shadow-lg opacity-0 transition-opacity duration-500'
 				/>
 				<button
 					id='radio-play'
@@ -95,7 +95,11 @@ const platforms = [
 		</div>
 	</div>
 
-	<section aria-label={playlistOn} class='flex flex-col items-center justify-center px-4 py-10'>
+	<section
+		id='radio-playlist-links'
+		aria-label={playlistOn}
+		class='flex flex-col items-center justify-center px-4 py-10'
+	>
 		<div
 			id='radio-listener-count'
 			data-label-one={labels.listenerOne}
@@ -148,6 +152,37 @@ const platforms = [
 		.show-radio-controls > #radio-play {
 			opacity: 1;
 			pointer-events: auto;
+		}
+
+		/*
+		 * Recording-only stage mode (`?stage`): strip the page to cover art, metadata
+		 * and glow so a screen capture needs no cropping. Driven by a data attribute
+		 * on <html> rather than classes on each element, so it can reach Nav/Footer
+		 * (owned by BaseLayout) without the page reaching into the layout.
+		 *
+		 * Hidden with `display: none` — `visibility: hidden` would leave the flex
+		 * layout reserving their space and the cover off-centre.
+		 */
+		:root[data-radio-stage] :is(nav, header, footer, #radio-playlist-links, #radio-miniplayer) {
+			display: none;
+		}
+
+		/* The page root sizes itself against the nav/footer that are now gone. */
+		:root[data-radio-stage] #radio-page-root {
+			height: 100dvh;
+		}
+
+		/* Padding exists to clear the nav; without it the cover can sit higher. */
+		:root[data-radio-stage] body > div {
+			padding-left: 0;
+			padding-right: 0;
+		}
+
+		/* The play button is a hover affordance, not part of the shot. It still
+		   works — it's transparent, not removed — so you can start playback and
+		   capture without it appearing in frame. */
+		:root[data-radio-stage] #radio-play {
+			opacity: 0 !important;
 		}
 	</style>
 
@@ -312,6 +347,14 @@ const platforms = [
 			}
 			const drift = positiveParam('drift', 0)
 			const driftSpeed = positiveParam('driftSpeed', 1)
+
+			// `?stage` strips the page to cover + metadata + glow for recording. The
+			// styling lives in CSS keyed off this attribute (see the <style> block).
+			// Set on <html> rather than the page root so it can also reach the nav and
+			// footer, which BaseLayout owns. Toggled per navigation rather than set
+			// once: Astro client-side nav keeps <html>, so leaving it set would strip
+			// every subsequent page too.
+			document.documentElement.toggleAttribute('data-radio-stage', params.has('stage'))
 
 			const glow = mount(coverEl, {
 				drift,

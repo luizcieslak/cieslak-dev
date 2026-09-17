@@ -26,6 +26,13 @@ const locale = Astro.currentLocale ?? 'en'
 			if (localStorage.theme === 'dark') {
 				document.documentElement.classList.add('dark')
 			}
+			// Recording-only stage mode (`?stage` on /radio/). Set here, before paint,
+			// so a capture never catches a frame of the full page chrome before it is
+			// stripped. The radio page re-applies this on every client-side navigation;
+			// this pass only covers the initial load.
+			if (new URLSearchParams(location.search).has('stage')) {
+				document.documentElement.setAttribute('data-radio-stage', '')
+			}
 		</script>
 		<ViewTransitions />
 		<PostHog />
