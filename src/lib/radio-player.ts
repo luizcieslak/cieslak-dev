@@ -4,6 +4,11 @@ export type RadioTrack = {
 	album?: string
 	albumArtUrl?: string
 	coverUrl?: string
+	/**
+	 * Styling the track asks for, set per-track in the radio server's admin UI.
+	 * Absent means "no opinion" — leave the visitor's own theme alone.
+	 */
+	theme?: 'light' | 'dark'
 }
 
 export type RadioState = {
@@ -72,10 +77,24 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		internal.listeners.forEach(l => l(snapshot))
 	}
 
+	// Tracks can ask for a light/dark look, used when recording promo videos so the
+	// page matches the song. Applied on CHANGE only, so it doesn't fight the
+	// visitor's theme toggle: a manual click stands until the next track wants
+	// something different. Deliberately not persisted to localStorage — the
+	// visitor's own preference stays the stored one.
+	let appliedTrackTheme: RadioTrack['theme'] | null = null
+
+	const applyTrackTheme = (theme: RadioTrack['theme']) => {
+		if (!theme || theme === appliedTrackTheme) return
+		appliedTrackTheme = theme
+		document.documentElement.classList.toggle('dark', theme === 'dark')
+	}
+
 	const setTrack = (track: RadioTrack | null | undefined) => {
 		if (!track) return
 		internal.state = { ...internal.state, track }
 		updateMediaSession(track)
+		applyTrackTheme(track.theme)
 		emit()
 	}
 
