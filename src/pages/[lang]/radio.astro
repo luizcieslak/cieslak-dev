@@ -184,6 +184,37 @@ const platforms = [
 		:root[data-radio-stage] #radio-play {
 			opacity: 0 !important;
 		}
+
+		/*
+		 * Metadata type scales with the frame, matching what the cover already does
+		 * with `w-[min(78vw,60vw)]`. The px sizes outside stage mode are tuned for a
+		 * ~360px phone; at a 1080-wide capture they render at the same physical size
+		 * while the cover grows, so the text reads as tiny. vw keeps the proportions
+		 * the phone layout has, at any capture size.
+		 *
+		 * Tunable live from the console, e.g.
+		 *   document.documentElement.style.setProperty('--stage-title', '7vw')
+		 */
+		:root[data-radio-stage] {
+			--stage-title: 6.4vw;
+			--stage-artist: 4.4vw;
+			--stage-album: 4.4vw;
+		}
+
+		:root[data-radio-stage] #radio-title {
+			font-size: var(--stage-title);
+		}
+
+		:root[data-radio-stage] #radio-artist {
+			font-size: var(--stage-artist);
+		}
+
+		/* Sized on the <p>, not the <em> it wraps: setting it on the inline <em>
+		   alone leaves the paragraph's line box at the old size, which crowds the
+		   line spacing. `:has()` reaches the parent since it carries no id. */
+		:root[data-radio-stage] p:has(> #radio-album) {
+			font-size: var(--stage-album);
+		}
 	</style>
 
 	<script>
