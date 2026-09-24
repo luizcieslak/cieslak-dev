@@ -35,10 +35,6 @@ const platforms = [
 		data-label-cover-suffix={labels.coverSuffix}
 		class='flex h-[calc(100dvh-4.5rem)] lg:h-[calc(100dvh-10rem)] flex-col items-center justify-center px-4 py-2 sm:py-4'
 	>
-		{/* Stage-only branding: the nav (with its `lofi radio` pill) is hidden in
-		stage mode, so the shot needs its own wordmark. CSS keyed off
-		`:root[data-radio-stage]` reveals it; it's `display: none` otherwise. */}
-		<p id='radio-stage-header' aria-hidden='true'>lofi.md</p>
 		<div class='flex w-full max-w-3xl flex-col items-center justify-center text-center gap-3 sm:gap-4'>
 			<div class='group relative inline-flex items-center justify-center overflow-visible max-w-full'>
 				<div
@@ -200,39 +196,9 @@ const platforms = [
 		 *   document.documentElement.style.setProperty('--stage-title', '7vw')
 		 */
 		:root[data-radio-stage] {
-			--stage-header: 3.2vw;
 			--stage-title: 6.4vw;
 			--stage-artist: 4.4vw;
 			--stage-album: 4.4vw;
-		}
-
-		/*
-		 * Stage wordmark, standing in for the nav pill that stage mode hides.
-		 * Absolutely positioned so it doesn't push the cover off the vertical
-		 * centre of the frame — the whole point of the page root being a
-		 * centred flex column.
-		 */
-		#radio-stage-header {
-			display: none;
-		}
-
-		:root[data-radio-stage] #radio-stage-header {
-			display: block;
-			position: absolute;
-			top: 4vw;
-			left: 50%;
-			transform: translateX(-50%);
-			font-family: 'Space Mono', monospace;
-			font-size: var(--stage-header);
-			font-weight: 700;
-			letter-spacing: 0.32em;
-			line-height: 1;
-			opacity: 0.9;
-			white-space: nowrap;
-		}
-
-		:root[data-radio-stage] #radio-page-root {
-			position: relative;
 		}
 
 		:root[data-radio-stage] #radio-title {
