@@ -22,7 +22,27 @@ const locale = Astro.currentLocale ?? 'en'
 <html lang={locale} class='antialiased break-words overflow-x-clip'>
 	<head>
 		<BaseHead {...head} />
-		<script>
+		{/*
+		`is:inline` is load-bearing: without it Astro bundles this as a
+		`type="module"`, which browsers defer until after parsing. That both
+		reintroduces a flash of the wrong theme/chrome and lets ThemeToggle's
+		`astro:page-load` pass (which re-derives the theme from storage) race
+		ahead of the `?theme=` write below.
+		*/}
+		<script is:inline>
+			const params = new URLSearchParams(location.search)
+
+			// `?theme=light|dark` forces a colour scheme, for recording a clip in a
+			// specific mode without hunting for the toggle. Written to localStorage
+			// rather than applied for this view alone, so the three places that read
+			// the stored theme (below, plus ThemeToggle's page-load and after-swap
+			// passes) all follow it with no extra plumbing. Consequence: the override
+			// persists after the param is dropped — flip it back with the toggle.
+			const themeParam = params.get('theme')
+			if (themeParam === 'light' || themeParam === 'dark') {
+				localStorage.theme = themeParam
+			}
+
 			if (localStorage.theme === 'dark') {
 				document.documentElement.classList.add('dark')
 			}
@@ -30,7 +50,7 @@ const locale = Astro.currentLocale ?? 'en'
 			// so a capture never catches a frame of the full page chrome before it is
 			// stripped. The radio page re-applies this on every client-side navigation;
 			// this pass only covers the initial load.
-			if (new URLSearchParams(location.search).has('stage')) {
+			if (params.has('stage')) {
 				document.documentElement.setAttribute('data-radio-stage', '')
 			}
 		</script>
