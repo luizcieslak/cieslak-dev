@@ -37,6 +37,16 @@ try {
 <figure
 	class='ambient-glow-sandbox not-prose my-10 rounded-lg border border-main bg-muted/30 p-4'
 	data-demo-images={JSON.stringify(demoImages)}
+	data-label-enable={t('glow.pulse.enable')}
+	data-label-play={t('glow.pulse.play')}
+	data-label-pause={t('glow.pulse.pause')}
+	data-label-connecting={t('glow.pulse.connecting')}
+	data-label-pulsing-to={t('glow.pulse.pulsingTo')}
+	data-label-paused={t('glow.pulse.paused')}
+	data-label-blocked={t('glow.pulse.blocked')}
+	data-label-unsupported={t('glow.pulse.unsupported')}
+	data-label-off={t('glow.pulse.off')}
+	data-label-amount={t('glow.pulse.amount')}
 >
 	<div
 		class='ambient-glow-sandbox-stage relative mx-auto flex aspect-square w-full max-w-md items-center justify-center overflow-visible'
@@ -47,6 +57,25 @@ try {
 			alt={defaultAlt}
 			crossorigin='anonymous'
 		/>
+	</div>
+
+	<div class='ambient-glow-sandbox-pulse mt-5 grid gap-2 rounded-md border border-main p-3 text-sm'>
+		<p class='font-medium'>{t('glow.pulse.title')}</p>
+		<p class='text-xs opacity-70'>{t('glow.pulse.hint')}</p>
+		<div class='flex flex-wrap items-center gap-x-3 gap-y-2'>
+			<button
+				type='button'
+				class='ambient-glow-sandbox-pulse-toggle rounded-md border border-main px-3 py-1.5 font-medium opacity-90 transition-opacity hover:opacity-100 disabled:opacity-50'
+			>
+				{t('glow.pulse.enable')}
+			</button>
+			<span class='ambient-glow-sandbox-pulse-status min-w-0 flex-1 text-xs opacity-70' aria-live='polite'
+			></span>
+		</div>
+		<canvas class='ambient-glow-sandbox-spectrum hidden h-12 w-full' aria-hidden='true'></canvas>
+		<div class='ambient-glow-sandbox-pulse-controls grid gap-x-2'>
+			<!-- pulse amount slider; see <script> below -->
+		</div>
 	</div>
 
 	<div class='mt-5 grid gap-3 text-sm'>
@@ -81,7 +110,17 @@ try {
 </figure>
 
 <script>
-	import { mount, type GlowOptions } from '../lib/ambient-glow'
+	import { bandForRank, mount, type GlowHandle, type GlowOptions } from '../lib/ambient-glow'
+	import type { PulseFrame } from '../lib/audio-pulse'
+	import { createPulseDriver, type PulseDriver } from '../lib/glow-pulse-driver'
+	import {
+		getRadioPlayer,
+		type AnalysisFailure,
+		type RadioPlayer,
+		type RadioState,
+	} from '../lib/radio-player'
+
+	const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
 
 	type ControlKey = keyof GlowOptions
 
@@ -130,6 +169,15 @@ try {
 		{ key: 'skipWhite', label: 'Skip near-white pixels', default: true },
 	]
 
+	const PULSE_AMOUNT: SliderSpec = {
+		key: 'pulseAmount',
+		label: 'Pulse amount',
+		min: 0,
+		max: 2,
+		step: 0.05,
+		default: 1,
+	}
+
 	const SPEC_BY_KEY = new Map<ControlKey, SliderSpec>(
 		[...CURATED, ...ADVANCED_SLIDERS].map(spec => [spec.key, spec]),
 	)
@@ -163,6 +211,159 @@ try {
 		return row
 	}
 
+	/**
+	 * Wires one sandbox to the radio: the explicit pulse button (the only thing
+	 * allowed to tap the audio, see RadioPlayer.enableAnalysis), the rAF loop
+	 * feeding glow.setPulse(), and the mini spectrum. Returns a cleanup.
+	 */
+	interface PulseBinding {
+		/** Call when the pulse amount changes: 0 stops all motion, >0 restarts it. */
+		refresh: () => void
+		cleanup: () => void
+	}
+
+	function bindPulse(
+		root: HTMLElement,
+		glow: GlowHandle,
+		player: RadioPlayer,
+		getAmount: () => number,
+		signal: AbortSignal,
+	): PulseBinding {
+		const labels = root.dataset
+		const toggle = root.querySelector<HTMLButtonElement>('.ambient-glow-sandbox-pulse-toggle')!
+		const status = root.querySelector<HTMLElement>('.ambient-glow-sandbox-pulse-status')!
+		const canvas = root.querySelector<HTMLCanvasElement>('.ambient-glow-sandbox-spectrum')!
+		const canvasCtx = canvas.getContext('2d')
+
+		let state: RadioState = player.getState()
+		let connecting = false
+		// Known up front on Safari/iOS: never offer a click that can't work (and
+		// would only start the radio).
+		let failure: AnalysisFailure | null = player.getAnalyser() || player.canAnalyse() ? null : 'unsupported'
+		// Per band: the colour of the blob it drives, or null if no blob follows it.
+		let barColors: Array<string | null> = []
+		let textColor = ''
+		let framesSinceColors = Infinity
+
+		// Assigned below; player.subscribe() inside createPulseDriver calls onState
+		// synchronously, before the assignment, so render() must tolerate its absence.
+		let driver: PulseDriver | null = null
+		const tapped = () => driver?.hasAnalyser() ?? false
+
+		const render = () => {
+			// Only "blocked" is worth retrying; unsupported/failed won't change on a new click.
+			toggle.disabled = connecting || failure === 'unsupported' || failure === 'failed'
+			if (!tapped()) {
+				toggle.textContent = labels.labelEnable ?? ''
+				if (connecting) status.textContent = labels.labelConnecting ?? ''
+				else if (failure === 'blocked') status.textContent = labels.labelBlocked ?? ''
+				else if (failure) status.textContent = labels.labelUnsupported ?? ''
+				else status.textContent = ''
+				canvas.classList.add('hidden')
+				return
+			}
+			canvas.classList.toggle('hidden', getAmount() === 0)
+			toggle.textContent = (state.wantPlaying ? labels.labelPause : labels.labelPlay) ?? ''
+			if (state.playing && getAmount() === 0) {
+				status.textContent = labels.labelOff ?? ''
+			} else if (state.playing && state.track) {
+				const who = [state.track.title, state.track.artist].filter(Boolean).join(' — ')
+				status.textContent = `${labels.labelPulsingTo ?? ''} ${who}`
+			} else if (state.wantPlaying) {
+				status.textContent = labels.labelConnecting ?? ''
+			} else {
+				status.textContent = labels.labelPaused ?? ''
+			}
+		}
+
+		const refreshColors = (bandCount: number) => {
+			const majors = glow.getBlobs().filter(blob => blob.kind === 'major')
+			barColors = new Array<string | null>(bandCount).fill(null)
+			majors.forEach(({ rank, color }) => {
+				barColors[bandForRank(rank, majors.length, bandCount)] = `rgb(${color.r},${color.g},${color.b})`
+			})
+			textColor = getComputedStyle(canvas).color
+		}
+
+		const drawSpectrum = (frame: PulseFrame) => {
+			if (!canvasCtx) return
+			const dpr = window.devicePixelRatio || 1
+			const w = Math.round(canvas.clientWidth * dpr)
+			const h = Math.round(canvas.clientHeight * dpr)
+			if (!w || !h) return
+			if (canvas.width !== w || canvas.height !== h) {
+				canvas.width = w
+				canvas.height = h
+			}
+			// Colours only change with the image/options/theme; refresh twice a second.
+			if (framesSinceColors++ > 30) {
+				framesSinceColors = 0
+				refreshColors(frame.bands.length)
+			}
+			canvasCtx.clearRect(0, 0, w, h)
+			const gap = 4 * dpr
+			const barW = (w - gap * (frame.bands.length - 1)) / frame.bands.length
+			frame.bands.forEach((value, i) => {
+				const barH = Math.max(2 * dpr, value * h)
+				const color = barColors[i]
+				// Bands no blob listens to are drawn neutral and faint.
+				canvasCtx.fillStyle = color ?? textColor
+				canvasCtx.globalAlpha = color ? 0.35 + 0.65 * value : 0.15 + 0.25 * value
+				canvasCtx.fillRect(i * (barW + gap), h - barH, barW, barH)
+			})
+			// Loudness as a thin line across, beats as a flash of it.
+			canvasCtx.globalAlpha = 0.4 + 0.6 * frame.beat
+			canvasCtx.fillStyle = textColor
+			canvasCtx.fillRect(0, h - frame.level * h, w, Math.max(1, dpr * (1 + 2 * frame.beat)))
+			canvasCtx.globalAlpha = 1
+		}
+
+		const pulseDriver = createPulseDriver({
+			glow,
+			player,
+			observe: root,
+			getAmount,
+			onFrame: drawSpectrum,
+			onState: next => {
+				state = next
+				render()
+			},
+		})
+
+		toggle.addEventListener(
+			'click',
+			() => {
+				if (tapped()) {
+					player.toggle()
+					return
+				}
+				if (failure === 'unsupported' || failure === 'failed') return
+				connecting = true
+				failure = null
+				const pending = pulseDriver.requestTap()
+				render()
+				void pending.then(result => {
+					connecting = false
+					if (signal.aborted) return
+					if (!result.ok) failure = result.reason
+					render()
+				})
+			},
+			{ signal },
+		)
+
+		driver = pulseDriver
+		render()
+
+		return {
+			refresh: () => {
+				render()
+				pulseDriver.refresh()
+			},
+			cleanup: () => pulseDriver.destroy(),
+		}
+	}
+
 	document.addEventListener('astro:page-load', () => {
 		const roots = document.querySelectorAll<HTMLElement>('.ambient-glow-sandbox')
 		if (roots.length === 0) return
@@ -178,12 +379,26 @@ try {
 			const randomize = root.querySelector<HTMLButtonElement>('.ambient-glow-sandbox-randomize')!
 			// Covers discovered at build time from public/lofi-radio/glow-demo/ (see frontmatter).
 			const demoImages = JSON.parse(root.dataset.demoImages || '[]') as string[]
+			const pulseHost = root.querySelector<HTMLElement>('.ambient-glow-sandbox-pulse-controls')!
+			const audio = document.getElementById('radio-audio') as HTMLAudioElement | null
+
+			// Motion-sensitive readers start with a static glow; the slider can opt in.
+			const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+			const pulseSpec: SliderSpec = {
+				...PULSE_AMOUNT,
+				label: root.dataset.labelAmount || PULSE_AMOUNT.label,
+				default: reducedMotion ? 0 : PULSE_AMOUNT.default,
+			}
+			let pulseAmount = pulseSpec.default
+			let pulseBinding: PulseBinding | null = null
 
 			CURATED.forEach(spec => curatedHost.appendChild(buildSliderRow(spec)))
+			if (audio) pulseHost.appendChild(buildSliderRow(pulseSpec))
+			else root.querySelector('.ambient-glow-sandbox-pulse')?.remove()
 			ADVANCED_SLIDERS.forEach(spec => advancedHost.appendChild(buildSliderRow(spec)))
 			ADVANCED_BOOLS.forEach(spec => advancedHost.appendChild(buildBoolRow(spec)))
 
-			const glow = mount(img)
+			const glow = mount(img, { pulseAmount })
 
 			const controller = new AbortController()
 			const { signal } = controller
@@ -222,7 +437,11 @@ try {
 						if (output) pendingDisplays.set(output, Number.isInteger(value) ? `${value}` : value.toFixed(2))
 						const patch = pendingPatch as Record<string, number | boolean>
 						patch[key] = value
-						if (key === 'fadeMs') {
+						if (key === 'pulseAmount') {
+							// Scales per-frame motion only; no fade override, no rebuild.
+							pulseAmount = value
+							pulseBinding?.refresh()
+						} else if (key === 'fadeMs') {
 							userFadeMs = value
 						} else {
 							patch.fadeMs = FADE_OVERRIDE_MS
@@ -234,7 +453,7 @@ try {
 				input.addEventListener(
 					'change',
 					() => {
-						if (key === 'fadeMs') return
+						if (key === 'fadeMs' || key === 'pulseAmount') return
 						;(pendingPatch as Record<string, number | boolean>).fadeMs = userFadeMs
 						schedule()
 					},
@@ -308,7 +527,12 @@ try {
 				{ signal },
 			)
 
+			pulseBinding = audio
+				? bindPulse(root, glow, getRadioPlayer(audio, RADIO_API), () => pulseAmount, signal)
+				: null
+
 			cleanups.push(() => {
+				pulseBinding?.cleanup()
 				controller.abort()
 				if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
 				glow.destroy()

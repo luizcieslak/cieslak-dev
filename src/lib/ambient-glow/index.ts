@@ -1,4 +1,6 @@
 // Originally from https://codepen.io/luizcieslak/pen/bNeNKLK
+import type { PulseFrame } from '../audio-pulse'
+
 export interface GlowOptions {
 	gridSize?: number
 	blur?: number
@@ -21,6 +23,8 @@ export interface GlowOptions {
 	sideBloomCount?: number
 	sideBloomOpacity?: number
 	sideBloomRadius?: number
+	/** How strongly setPulse() frames deform the glow; 0 = static. */
+	pulseAmount?: number
 }
 
 export interface Rgb {
@@ -33,6 +37,13 @@ export interface GlowHandle {
 	setOptions(patch: Partial<GlowOptions>): void
 	update(): void
 	getColors(): Array<Rgb | null>
+	/** The blobs currently rendered, majors first in rank order. */
+	getBlobs(): GlowBlob[]
+	/**
+	 * Drive the glow from audio features. The first frame swaps the static layers
+	 * for a per-blob layer animated with transform/opacity only; null swaps back.
+	 */
+	setPulse(frame: PulseFrame | null): void
 	destroy(): void
 }
 
@@ -68,6 +79,7 @@ const DEFAULTS: Required<GlowOptions> = {
 	sideBloomCount: 2,
 	sideBloomOpacity: 0.32,
 	sideBloomRadius: 42,
+	pulseAmount: 1,
 }
 
 export function extractColors(img: HTMLImageElement, userOptions: GlowOptions = {}): Array<Rgb | null> {
@@ -79,13 +91,23 @@ export function extractColors(img: HTMLImageElement, userOptions: GlowOptions = 
 }
 
 export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): GlowHandle {
-	const parent = img.parentElement
-	if (!parent) throw new Error('ambient-glow: img must be attached to the DOM before mount()')
+	const maybeParent = img.parentElement
+	if (!maybeParent) throw new Error('ambient-glow: img must be attached to the DOM before mount()')
+	const parent: HTMLElement = maybeParent
 
 	let options: Required<GlowOptions> = { ...DEFAULTS, ...userOptions }
 	let lastColors: Array<Rgb | null> = []
 	let activeKey: 'a' | 'b' = 'a'
 	let hasApplied = false
+
+	// Pulse mode: layers with one element per major blob (plus one for the side
+	// blooms) so audio frames only touch transform/opacity — no per-frame
+	// gradient repaint or re-blur. Double-buffered like the static layers so a
+	// new cover (e.g. a track change on /radio) crossfades instead of snapping.
+	// Built lazily on the first frame.
+	let pulseFrame: PulseFrame | null = null
+	let pulseSlots: [PulseSlot, PulseSlot] | null = null
+	let activePulse: 0 | 1 = 0
 
 	const layerA = createLayer(options)
 	const layerB = createLayer(options)
@@ -132,16 +154,143 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 			void next.offsetHeight
 			hasApplied = true
 		}
-		next.style.opacity = '0.8'
+		next.style.opacity = pulseFrame ? '0' : RESTING_OPACITY
 		prev.style.opacity = '0'
 		activeKey = activeKey === 'a' ? 'b' : 'a'
+		if (pulseFrame && pulseSlots) {
+			// Crossfade to freshly built pulse children, like the static layers do.
+			const outgoing = pulseSlots[activePulse]
+			activePulse = activePulse === 0 ? 1 : 0
+			const incoming = pulseSlots[activePulse]
+			fillPulseSlot(incoming)
+			incoming.el.style.opacity = RESTING_OPACITY
+			outgoing.el.style.opacity = '0'
+			scheduleSlotClear(outgoing)
+			renderPulse(pulseFrame)
+		}
+	}
+
+	function ensurePulseSlots(): [PulseSlot, PulseSlot] {
+		if (pulseSlots) return pulseSlots
+		const make = (): PulseSlot => {
+			const el = document.createElement('div')
+			el.setAttribute('aria-hidden', 'true')
+			stylePulseLayer(el, options)
+			parent.insertBefore(el, img)
+			return { el, blobs: [], majorEls: [], sideEl: null, clearTimer: null }
+		}
+		pulseSlots = [make(), make()]
+		return pulseSlots
+	}
+
+	function fillPulseSlot(slot: PulseSlot) {
+		if (slot.clearTimer !== null) {
+			clearTimeout(slot.clearTimer)
+			slot.clearTimer = null
+		}
+		slot.blobs = computeBlobs(lastColors, options)
+		const majors = slot.blobs.filter(blob => blob.kind === 'major')
+		const sides = slot.blobs.filter(blob => blob.kind === 'side')
+		const children: HTMLDivElement[] = []
+
+		// Side blooms only breathe with the bass as a group, so they share one
+		// layer-sized element instead of costing a composited layer each.
+		slot.sideEl = null
+		if (sides.length) {
+			slot.sideEl = createPulseChild(options.blur)
+			slot.sideEl.style.inset = '0'
+			slot.sideEl.style.background = sides.map(blob => blobGradient(blob)).join(', ')
+			children.push(slot.sideEl)
+		}
+
+		// Each major blob gets a box exactly around its own ellipse rather than a
+		// layer-sized one, to keep GPU memory small. No padding for the blur is
+		// needed: filter output paints past the element's box.
+		slot.majorEls = majors.map(blob => {
+			const el = createPulseChild(options.blur)
+			el.style.left = `${blob.x - blob.radiusX}%`
+			el.style.top = `${blob.y - blob.radiusY}%`
+			el.style.width = `${blob.radiusX * 2}%`
+			el.style.height = `${blob.radiusY * 2}%`
+			el.style.background = blobGradient(blob, '50% 50% at 50% 50%')
+			return el
+		})
+		// The static string paints the first gradient on top; mirror that order.
+		children.push(...[...slot.majorEls].reverse())
+		slot.el.replaceChildren(...children)
+	}
+
+	// Drop a hidden slot's composited children once it has faded out, so they
+	// don't hold GPU memory. Skipped if the slot became visible again meanwhile.
+	function scheduleSlotClear(slot: PulseSlot) {
+		if (slot.clearTimer !== null) clearTimeout(slot.clearTimer)
+		slot.clearTimer = setTimeout(() => {
+			slot.clearTimer = null
+			if (pulseFrame && pulseSlots?.[activePulse] === slot) return
+			slot.el.replaceChildren()
+			slot.blobs = []
+			slot.majorEls = []
+			slot.sideEl = null
+		}, options.fadeMs + 50)
+	}
+
+	function renderPulse(frame: PulseFrame) {
+		// Render both slots so the outgoing one keeps moving while it fades.
+		pulseSlots?.forEach(slot => {
+			if (slot.majorEls.length === 0 && !slot.sideEl) return
+			const t = pulseTransforms(slot.blobs, frame, options)
+			slot.el.style.transform = `translate(-50%, -50%) scale(${t.layerScale})`
+			if (slot.sideEl) slot.sideEl.style.transform = `scale(${t.sideScale})`
+			slot.majorEls.forEach((el, i) => {
+				const p = t.majors[i]
+				if (!p) return
+				el.style.transform = `translate(${p.dx}cqw, ${p.dy}cqh) scale(${p.scale})`
+				el.style.opacity = `${p.opacity}`
+			})
+		})
+	}
+
+	function setPulse(frame: PulseFrame | null) {
+		const active = activeKey === 'a' ? layerA : layerB
+		if (!frame) {
+			if (!pulseFrame) return
+			pulseFrame = null
+			pulseSlots?.forEach(slot => {
+				slot.el.style.opacity = '0'
+				scheduleSlotClear(slot)
+			})
+			if (hasApplied) active.style.opacity = RESTING_OPACITY
+			return
+		}
+
+		const entering = !pulseFrame
+		pulseFrame = frame
+		if (entering) {
+			const slots = ensurePulseSlots()
+			// Always rebuild on entry: colours/options may have changed while the
+			// previous children were fading out.
+			fillPulseSlot(slots[activePulse])
+			if (hasApplied) {
+				slots[activePulse].el.style.opacity = RESTING_OPACITY
+				active.style.opacity = '0'
+			}
+		}
+		renderPulse(frame)
 	}
 
 	return {
 		setOptions(patch) {
 			options = { ...options, ...patch }
+			// pulseAmount only scales the per-frame transforms: no geometry, no
+			// rebuild, no crossfade. Just re-render the current frame.
+			const keys = Object.keys(patch)
+			if (keys.length > 0 && keys.every(k => k === 'pulseAmount')) {
+				if (pulseFrame) renderPulse(pulseFrame)
+				return
+			}
 			styleLayer(layerA, options)
 			styleLayer(layerB, options)
+			pulseSlots?.forEach(slot => stylePulseLayer(slot.el, options))
 			const needsExtract = Object.keys(patch).some(k => EXTRACTION_KEYS.includes(k as keyof GlowOptions))
 			schedule(needsExtract)
 		},
@@ -151,11 +300,19 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		getColors() {
 			return [...lastColors]
 		},
+		getBlobs() {
+			return computeBlobs(lastColors, options)
+		},
+		setPulse,
 		destroy() {
 			img.removeEventListener('load', onLoad)
 			if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
 			layerA.remove()
 			layerB.remove()
+			pulseSlots?.forEach(slot => {
+				if (slot.clearTimer !== null) clearTimeout(slot.clearTimer)
+				slot.el.remove()
+			})
 		},
 	}
 }
@@ -165,6 +322,48 @@ function createLayer(opts: Required<GlowOptions>): HTMLDivElement {
 	el.setAttribute('aria-hidden', 'true')
 	styleLayer(el, opts)
 	return el
+}
+
+const RESTING_OPACITY = '0.8'
+
+/** One buffer of the double-buffered pulse layer. */
+interface PulseSlot {
+	el: HTMLDivElement
+	blobs: GlowBlob[]
+	/** Aligned with the major blobs in `blobs`, in rank order. */
+	majorEls: HTMLDivElement[]
+	sideEl: HTMLDivElement | null
+	clearTimer: ReturnType<typeof setTimeout> | null
+}
+
+function createPulseChild(blur: number): HTMLDivElement {
+	const el = document.createElement('div')
+	const s = el.style
+	s.position = 'absolute'
+	s.filter = `blur(${blur}px)`
+	s.willChange = 'transform, opacity'
+	s.pointerEvents = 'none'
+	return el
+}
+
+/** Like styleLayer, minus filter/transform: blur lives on the children and the
+ * transform is owned by the per-frame pulse render. */
+function stylePulseLayer(el: HTMLDivElement, opts: Required<GlowOptions>) {
+	const s = el.style
+	s.position = 'absolute'
+	s.top = '50%'
+	s.left = '50%'
+	if (!s.transform) s.transform = 'translate(-50%, -50%)'
+	s.zIndex = '0'
+	s.width = `${opts.sizeMultiplier * 100}%`
+	s.height = `${Math.max(100, opts.verticalStretch * 100)}%`
+	// Lets the children express shimmer offsets in cqw/cqh (% of this layer).
+	s.containerType = 'size'
+	// Scaled every frame while pulsing; keep it on its own compositor layer.
+	s.willChange = 'transform'
+	s.pointerEvents = 'none'
+	s.transition = `opacity ${opts.fadeMs}ms ease`
+	if (s.opacity === '') s.opacity = '0'
 }
 
 function styleLayer(el: HTMLDivElement, opts: Required<GlowOptions>) {
@@ -259,7 +458,24 @@ function dominantColor(
 	return { r: br * binSize, g: bg * binSize, b: bb * binSize }
 }
 
-function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): string {
+type GradientStop = { kind: 'color'; alpha: number; at: number } | { kind: 'transparent'; at: number }
+
+/** One radial-gradient blob, in % of the glow layer. Shared by the static CSS
+ * string and the per-blob pulse layer so both render the same geometry. */
+export interface GlowBlob {
+	kind: 'major' | 'side'
+	/** Rank among blobs of the same kind (0 = most intense colour). */
+	rank: number
+	color: Rgb
+	x: number
+	y: number
+	radiusX: number
+	radiusY: number
+	/** Colour stops, positions in % of the gradient ray. */
+	stops: GradientStop[]
+}
+
+export function computeBlobs(colors: Array<Rgb | null>, opts: Required<GlowOptions>): GlowBlob[] {
 	const weighted = colors
 		.map((color, index) => {
 			if (!color) return null
@@ -273,11 +489,9 @@ function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): 
 		.filter((entry): entry is NonNullable<typeof entry> => entry !== null)
 		.sort((a, b) => b.intensity - a.intensity)
 
-	if (weighted.length === 0) return 'none'
-
-	const parts: string[] = []
+	const blobs: GlowBlob[] = []
 	const major = weighted.slice(0, opts.majorBlobCount)
-	for (const entry of major) {
+	major.forEach((entry, rank) => {
 		const seed = colorSeed(entry.color, entry.index)
 		const x = clamp(
 			50 + entry.centeredX * (24 * opts.horizontalStretch) + randomBetween(seed, -opts.jitter, opts.jitter),
@@ -293,10 +507,21 @@ function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): 
 		const radiusY = opts.majorBlobRadius * randomBetween(seed + 3, 0.75, 1.25) * opts.verticalStretch
 		const opacity = clamp(opts.majorBlobOpacity * randomBetween(seed + 4, 0.82, 1.08), 0.12, 0.95)
 		const feather = clamp(opts.majorBlobFeather * randomBetween(seed + 5, 0.85, 1.15), radiusX + 10, 96)
-		parts.push(
-			`radial-gradient(${radiusX}% ${radiusY}% at ${x}% ${y}%, rgba(${entry.color.r},${entry.color.g},${entry.color.b},${opacity}) 0%, rgba(${entry.color.r},${entry.color.g},${entry.color.b},${opacity * 0.5}) ${Math.max(radiusX * 0.55, 18)}%, transparent ${feather}%)`,
-		)
-	}
+		blobs.push({
+			kind: 'major',
+			rank,
+			color: entry.color,
+			x,
+			y,
+			radiusX,
+			radiusY,
+			stops: [
+				{ kind: 'color', alpha: opacity, at: 0 },
+				{ kind: 'color', alpha: opacity * 0.5, at: Math.max(radiusX * 0.55, 18) },
+				{ kind: 'transparent', at: feather },
+			],
+		})
+	})
 
 	for (let i = 0; i < Math.min(opts.sideBloomCount, major.length); i++) {
 		const entry = major[i]
@@ -308,12 +533,108 @@ function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): 
 		const radiusX = opts.sideBloomRadius * randomBetween(seed + 2, 1.2, 1.8) * opts.horizontalStretch
 		const radiusY = opts.sideBloomRadius * randomBetween(seed + 3, 0.75, 1.15) * opts.verticalStretch
 		const opacity = clamp(opts.sideBloomOpacity * randomBetween(seed + 4, 0.8, 1.1), 0.08, 0.5)
-		parts.push(
-			`radial-gradient(${radiusX}% ${radiusY}% at ${x}% ${y}%, rgba(${entry.color.r},${entry.color.g},${entry.color.b},${opacity}) 0%, transparent 72%)`,
-		)
+		blobs.push({
+			kind: 'side',
+			rank: i,
+			color: entry.color,
+			x,
+			y,
+			radiusX,
+			radiusY,
+			stops: [
+				{ kind: 'color', alpha: opacity, at: 0 },
+				{ kind: 'transparent', at: 72 },
+			],
+		})
 	}
 
-	return parts.join(', ')
+	return blobs
+}
+
+/** CSS for one blob. `shape` defaults to the blob's own size/position in the layer. */
+function blobGradient(
+	blob: GlowBlob,
+	shape = `${blob.radiusX}% ${blob.radiusY}% at ${blob.x}% ${blob.y}%`,
+): string {
+	const { r, g, b } = blob.color
+	const stops = blob.stops
+		.map(stop =>
+			stop.kind === 'transparent'
+				? `transparent ${stop.at}%`
+				: `rgba(${r},${g},${b},${stop.alpha}) ${stop.at}%`,
+		)
+		.join(', ')
+	return `radial-gradient(${shape}, ${stops})`
+}
+
+export function buildGradient(colors: Array<Rgb | null>, opts: Required<GlowOptions>): string {
+	const blobs = computeBlobs(colors, opts)
+	if (blobs.length === 0) return 'none'
+	return blobs.map(blob => blobGradient(blob)).join(', ')
+}
+
+export interface BlobPulse {
+	scale: number
+	/** Offset in % of the glow layer (rendered as cqw/cqh). */
+	dx: number
+	dy: number
+	opacity: number
+}
+
+export interface GlowPulse {
+	layerScale: number
+	/** Aligned with the major blobs, in rank order. */
+	majors: BlobPulse[]
+	sideScale: number
+}
+
+/**
+ * Which spectrum band drives the major blob of this rank. Ranks are spread
+ * across the whole spectrum: first blob = lowest band, last = highest.
+ */
+export function bandForRank(rank: number, majorCount: number, bandCount: number): number {
+	if (majorCount <= 1 || bandCount <= 1) return 0
+	return Math.round((rank * (bandCount - 1)) / (majorCount - 1))
+}
+
+/**
+ * Map an audio frame onto per-blob deformations. Blob rank r (0 = most intense
+ * colour) listens to the band at the same relative position, so bass drives the
+ * dominant blob and treble the faintest. A silent frame is the identity.
+ */
+export function pulseTransforms(
+	blobs: GlowBlob[],
+	frame: PulseFrame,
+	opts: Required<GlowOptions>,
+): GlowPulse {
+	const a = Math.max(0, opts.pulseAmount)
+	const { bands, level, beat, centroid, time } = frame
+	const n = bands.length
+	const majors = blobs.filter(blob => blob.kind === 'major')
+	const trebleStart = Math.ceil((n * 2) / 3)
+	let treble = 0
+	for (let i = trebleStart; i < n; i++) treble += bands[i]
+	treble = n > trebleStart ? treble / (n - trebleStart) : 0
+	const bass = n ? bands[0] : 0
+	// Bright passages spread the blobs outwards, dull ones pull them in.
+	const spread = a * 0.25 * (centroid - 0.4) * level
+
+	return {
+		layerScale: 1 + a * (0.12 * level + 0.08 * beat),
+		sideScale: 1 + a * 0.2 * bass,
+		majors: majors.map(blob => {
+			const band = n ? bands[bandForRank(blob.rank, majors.length, n)] : 0
+			const kick = beat * (blob.rank === 0 ? 0.15 : 0.06)
+			const phase = time * (0.35 + 0.11 * blob.rank) * Math.PI * 2 + blob.rank * 1.7
+			const wobble = a * treble * (2 + opts.jitter * 0.12)
+			return {
+				scale: 1 + a * (0.45 * band + kick),
+				dx: (blob.x - 50) * spread + Math.sin(phase) * wobble,
+				dy: Math.cos(phase * 0.8) * wobble * 0.6,
+				opacity: 1 - Math.min(1, a) * 0.35 * (1 - band) * level,
+			}
+		}),
+	}
 }
 
 function getGridPosition(index: number, gridSize: number) {

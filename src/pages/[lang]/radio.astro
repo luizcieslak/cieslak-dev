@@ -91,6 +91,25 @@ const platforms = [
 						<em id='radio-album'></em>
 					</p>
 				</div>
+				<!-- Shown by the script only where the audio can be analysed (not Safari/iOS). -->
+				<div
+					id='radio-pulse'
+					data-label-connecting={t('glow.pulse.connecting')}
+					data-label-blocked={t('glow.pulse.blocked')}
+					data-label-unsupported={t('glow.pulse.unsupported')}
+					class='mt-4 hidden flex-col items-center gap-1'
+				>
+					<button
+						id='radio-pulse-toggle'
+						type='button'
+						aria-pressed='false'
+						title={t('radio.pulse.hint')}
+						class='rounded-full border border-main px-3 py-1 text-sm opacity-70 transition hover:opacity-100 disabled:opacity-40 aria-pressed:bg-muted aria-pressed:opacity-100'
+					>
+						{`✨ ${t('radio.pulse')}`}
+					</button>
+					<p id='radio-pulse-status' class='text-xs opacity-70' aria-live='polite'></p>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -152,8 +171,14 @@ const platforms = [
 	</style>
 
 	<script>
-		import { getRadioPlayer } from '../../lib/radio-player'
+		import { getRadioPlayer, type AnalysisFailure } from '../../lib/radio-player'
 		import { mount } from '../../lib/ambient-glow'
+		import {
+			createPulseDriver,
+			getPulseIntent,
+			setPulseIntent,
+			type PulseDriver,
+		} from '../../lib/glow-pulse-driver'
 
 		const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
 		const LISTENER_COUNT_POLL_INTERVAL_MS = 15000
@@ -315,9 +340,75 @@ const platforms = [
 				sideBloomRadius: 48,
 			})
 
+			// Audio-reactive glow. Tapping the audio stays an explicit click (see
+			// RadioPlayer.enableAnalysis); once this session is tapped — here or in the
+			// blog sandbox — the glow pulses by default unless the listener turned it
+			// off (session-scoped intent) or prefers reduced motion.
+			const pulseWrap = document.getElementById('radio-pulse')!
+			const pulseBtn = document.getElementById('radio-pulse-toggle') as HTMLButtonElement
+			const pulseStatus = document.getElementById('radio-pulse-status')!
+			const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+			const pulseWanted = () => {
+				const intent = getPulseIntent()
+				return intent ? intent === 'on' : !reducedMotion
+			}
+			let pulseConnecting = false
+			let pulseFailure: AnalysisFailure | null = null
+			// Assigned below; the driver's player.subscribe() calls back synchronously.
+			let driver: PulseDriver | null = null
+
+			const renderPulseUi = () => {
+				const tapped = driver?.hasAnalyser() ?? false
+				const available = tapped || player.canAnalyse()
+				pulseWrap.classList.toggle('hidden', !available)
+				pulseWrap.classList.toggle('flex', available)
+				pulseBtn.setAttribute('aria-pressed', String(tapped && pulseWanted()))
+				pulseBtn.disabled = pulseConnecting || pulseFailure === 'failed' || pulseFailure === 'unsupported'
+				const labels = pulseWrap.dataset
+				if (pulseConnecting) pulseStatus.textContent = labels.labelConnecting ?? ''
+				else if (pulseFailure === 'blocked') pulseStatus.textContent = labels.labelBlocked ?? ''
+				else if (pulseFailure) pulseStatus.textContent = labels.labelUnsupported ?? ''
+				else pulseStatus.textContent = ''
+			}
+
+			const pulseDriver = createPulseDriver({
+				glow,
+				player,
+				observe: coverFrameEl,
+				getAmount: () => (pulseWanted() ? 1 : 0),
+				onState: renderPulseUi,
+			})
+			driver = pulseDriver
+			renderPulseUi()
+
+			pulseBtn.addEventListener(
+				'click',
+				() => {
+					if (pulseDriver.hasAnalyser()) {
+						setPulseIntent(pulseWanted() ? 'off' : 'on')
+						pulseDriver.refresh()
+						renderPulseUi()
+						return
+					}
+					setPulseIntent('on')
+					pulseConnecting = true
+					pulseFailure = null
+					const pending = pulseDriver.requestTap()
+					renderPulseUi()
+					void pending.then(result => {
+						pulseConnecting = false
+						if (signal.aborted) return
+						if (!result.ok) pulseFailure = result.reason
+						renderPulseUi()
+					})
+				},
+				{ signal },
+			)
+
 			document.addEventListener(
 				'astro:before-preparation',
 				() => {
+					pulseDriver.destroy()
 					if (controlsVisibleTimer) clearTimeout(controlsVisibleTimer)
 					if (listenerCountTimer) clearInterval(listenerCountTimer)
 					unsubscribe()
