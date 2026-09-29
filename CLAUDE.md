@@ -103,6 +103,36 @@ Playback survives client-side navigation via Astro's `<ViewTransitions />` (alre
 
 Each surface calls `getRadioPlayer(audio, api)` to grab the singleton, then `subscribe()` for state updates and `toggle()` for play/pause. Scripts re-run on `astro:page-load` even inside persisted elements, so initialization is guarded by `window.__radioPlayer` and per-surface bindings (miniplayer) are guarded by `window.__radioMiniplayerBound`. Page-scoped surfaces (radio page, callout) re-bind their own listeners every navigation and clean up on `astro:before-preparation`.
 
+### Audio-Reactive Glow (opt-in analysis tap)
+
+Two surfaces can pulse with the live stream:
+- the [AmbientGlowSandbox](src/components/AmbientGlowSandbox.astro) in the lofi post, with a spectrum and an amount slider;
+- the `/radio` page's cover glow, via a "✨ Pulse" toggle that's hidden where analysis can't work.
+
+Both drive their glow through [src/lib/glow-pulse-driver.ts](src/lib/glow-pulse-driver.ts), which owns the rAF loop, the silence-fed tail and `requestTap()`, the one sanctioned tap sequence.
+
+On `/radio`, once the session is tapped (here or in the sandbox), the glow pulses by default. Two things override that: the session-scoped on/off intent (`window.__radioPulseIntent`, survives client-side navigation), and `prefers-reduced-motion`, which defaults it off. Pulse layers are double-buffered, so track changes crossfade.
+
+**Recording mode** (promo clips, see `docs/video-recording.md` in lofi-radio's `campaign/dj-controls`). `/radio` query params:
+- `?stage` strips the page to cover, metadata and glow, and hides the Pulse toggle.
+- `?drift=<amp>&driftSpeed=<x>` slowly drifts the blobs. Unlike `?pulse`, it does nothing under reduced motion.
+- `?theme=light|dark` forces the colour scheme.
+- `?pulse=<0–3>` sets the pulse strength; a bare `?pulse` means 1, and `0` forces it off. It writes the session intent, overriding reduced motion. With `?pulse` > 0, the page's own play button performs the tap inside that click.
+
+Drift and pulse compose. While pulsing, the 24fps static drift repaint stops and each pulse child adds its drift as a translate: the delta between `computeBlobs(colors, opts, phase)` and the phase-0 geometry, so clamping matches the static render. Everything stays compositor-only.
+
+The underlying layers:
+
+- **[src/lib/audio-pulse.ts](src/lib/audio-pulse.ts)** is pure feature extraction from `AnalyserNode` byte arrays: loudness, 8 log-spaced bands with a noise gate and AGC, beats from low-end spectral flux, and spectral centroid. It's unit-tested.
+- **[src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts)** handles pulse rendering. `glow.setPulse(frame)` swaps the static layers for one element per blob (majors in bounding boxes, side blooms layer-sized so they stay clipped like the static render). Each frame writes only `transform`/`opacity` (compositor-only), and `setPulse(null)` swaps back. The static `buildGradient` output is golden-tested to stay byte-identical, and `pulseAmount` scales the effect (0 = static).
+- **`player.enableAnalysis()`** in [radio-player.ts](src/lib/radio-player.ts) creates the tap. **Only an explicit click may call it** (through `requestTap()` in the pulse driver). That means the sandbox's pulse button, the `/radio` Pulse toggle, or the `/radio` play button when the URL has `?pulse` > 0. Never call it on mount or on a plain play, because the tap lasts the whole page session:
+  - It sets `crossOrigin="anonymous"` on the persisted `<audio>` (reconnecting once). So from then on the stream depends on lofi-radio sending `Access-Control-Allow-Origin` on `/stream`.
+  - On Chromium it uses `audio.captureStream()`, and the element keeps its own output path.
+  - On Firefox it uses `createMediaElementSource`, which **reroutes the element's output through the AudioContext** permanently. For that mode the player enforces "tapped && wantPlaying ⇒ context running" in `connect()`, on `statechange`, and on visibility resume. If the context can't be resumed, it stops rather than play silence.
+  - **Safari and every iOS browser get no tap** (`chooseTapMode` in [audio-tap-guard.ts](src/lib/audio-tap-guard.ts) returns null, and the sandbox says the browser can't analyse the stream). WebKit's `MediaElementAudioSourceNode` outputs silence for chunked, length-less streams like `/stream`, so routing there would mute the radio. This was verified in Playwright WebKit: a CORS file works, while the chunked stream reads all zeros.
+
+Tests: `pnpm test` (`node --test`, Node ≥ 23.6 for native TS type stripping, no extra deps).
+
 **Future work:** the miniplayer chrome is currently sized for mobile (full-width fixed bar). A desktop variant should be smaller and less prominent (e.g., bottom-right floating pill) — same player module, different chrome.
 
 ## Development
@@ -120,6 +150,9 @@ pnpm start
 
 # Type check and build
 pnpm build
+
+# Unit tests (node --test)
+pnpm test
 
 # Preview production build
 pnpm preview
