@@ -100,15 +100,14 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 	let activeKey: 'a' | 'b' = 'a'
 	let hasApplied = false
 
-	// Pulse mode: a separate layer with one element per major blob (plus one for
-	// the side blooms) so audio frames only touch transform/opacity — no
-	// per-frame gradient repaint or re-blur. Built lazily on the first frame.
+	// Pulse mode: layers with one element per major blob (plus one for the side
+	// blooms) so audio frames only touch transform/opacity — no per-frame
+	// gradient repaint or re-blur. Double-buffered like the static layers so a
+	// new cover (e.g. a track change on /radio) crossfades instead of snapping.
+	// Built lazily on the first frame.
 	let pulseFrame: PulseFrame | null = null
-	let pulseLayer: HTMLDivElement | null = null
-	let pulseBlobs: GlowBlob[] = []
-	let pulseMajorEls: HTMLDivElement[] = []
-	let pulseSideEl: HTMLDivElement | null = null
-	let pulseTeardown: ReturnType<typeof setTimeout> | null = null
+	let pulseSlots: [PulseSlot, PulseSlot] | null = null
+	let activePulse: 0 | 1 = 0
 
 	const layerA = createLayer(options)
 	const layerB = createLayer(options)
@@ -158,34 +157,56 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		next.style.opacity = pulseFrame ? '0' : RESTING_OPACITY
 		prev.style.opacity = '0'
 		activeKey = activeKey === 'a' ? 'b' : 'a'
-		if (pulseFrame && pulseLayer) {
-			buildPulseChildren()
-			pulseLayer.style.opacity = RESTING_OPACITY
+		if (pulseFrame && pulseSlots) {
+			// Crossfade to freshly built pulse children, like the static layers do.
+			const outgoing = pulseSlots[activePulse]
+			activePulse = activePulse === 0 ? 1 : 0
+			const incoming = pulseSlots[activePulse]
+			fillPulseSlot(incoming)
+			incoming.el.style.opacity = RESTING_OPACITY
+			outgoing.el.style.opacity = '0'
+			scheduleSlotClear(outgoing)
 			renderPulse(pulseFrame)
 		}
 	}
 
-	function buildPulseChildren() {
-		if (!pulseLayer) return
-		pulseBlobs = computeBlobs(lastColors, options)
-		const majors = pulseBlobs.filter(blob => blob.kind === 'major')
-		const sides = pulseBlobs.filter(blob => blob.kind === 'side')
+	function ensurePulseSlots(): [PulseSlot, PulseSlot] {
+		if (pulseSlots) return pulseSlots
+		const make = (): PulseSlot => {
+			const el = document.createElement('div')
+			el.setAttribute('aria-hidden', 'true')
+			stylePulseLayer(el, options)
+			parent.insertBefore(el, img)
+			return { el, blobs: [], majorEls: [], sideEl: null, clearTimer: null }
+		}
+		pulseSlots = [make(), make()]
+		return pulseSlots
+	}
+
+	function fillPulseSlot(slot: PulseSlot) {
+		if (slot.clearTimer !== null) {
+			clearTimeout(slot.clearTimer)
+			slot.clearTimer = null
+		}
+		slot.blobs = computeBlobs(lastColors, options)
+		const majors = slot.blobs.filter(blob => blob.kind === 'major')
+		const sides = slot.blobs.filter(blob => blob.kind === 'side')
 		const children: HTMLDivElement[] = []
 
 		// Side blooms only breathe with the bass as a group, so they share one
 		// layer-sized element instead of costing a composited layer each.
-		pulseSideEl = null
+		slot.sideEl = null
 		if (sides.length) {
-			pulseSideEl = createPulseChild(options.blur)
-			pulseSideEl.style.inset = '0'
-			pulseSideEl.style.background = sides.map(blob => blobGradient(blob)).join(', ')
-			children.push(pulseSideEl)
+			slot.sideEl = createPulseChild(options.blur)
+			slot.sideEl.style.inset = '0'
+			slot.sideEl.style.background = sides.map(blob => blobGradient(blob)).join(', ')
+			children.push(slot.sideEl)
 		}
 
 		// Each major blob gets a box exactly around its own ellipse rather than a
 		// layer-sized one, to keep GPU memory small. No padding for the blur is
 		// needed: filter output paints past the element's box.
-		pulseMajorEls = majors.map(blob => {
+		slot.majorEls = majors.map(blob => {
 			const el = createPulseChild(options.blur)
 			el.style.left = `${blob.x - blob.radiusX}%`
 			el.style.top = `${blob.y - blob.radiusY}%`
@@ -195,20 +216,37 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 			return el
 		})
 		// The static string paints the first gradient on top; mirror that order.
-		children.push(...[...pulseMajorEls].reverse())
-		pulseLayer.replaceChildren(...children)
+		children.push(...[...slot.majorEls].reverse())
+		slot.el.replaceChildren(...children)
+	}
+
+	// Drop a hidden slot's composited children once it has faded out, so they
+	// don't hold GPU memory. Skipped if the slot became visible again meanwhile.
+	function scheduleSlotClear(slot: PulseSlot) {
+		if (slot.clearTimer !== null) clearTimeout(slot.clearTimer)
+		slot.clearTimer = setTimeout(() => {
+			slot.clearTimer = null
+			if (pulseFrame && pulseSlots?.[activePulse] === slot) return
+			slot.el.replaceChildren()
+			slot.blobs = []
+			slot.majorEls = []
+			slot.sideEl = null
+		}, options.fadeMs + 50)
 	}
 
 	function renderPulse(frame: PulseFrame) {
-		if (!pulseLayer) return
-		const t = pulseTransforms(pulseBlobs, frame, options)
-		pulseLayer.style.transform = `translate(-50%, -50%) scale(${t.layerScale})`
-		if (pulseSideEl) pulseSideEl.style.transform = `scale(${t.sideScale})`
-		pulseMajorEls.forEach((el, i) => {
-			const p = t.majors[i]
-			if (!p) return
-			el.style.transform = `translate(${p.dx}cqw, ${p.dy}cqh) scale(${p.scale})`
-			el.style.opacity = `${p.opacity}`
+		// Render both slots so the outgoing one keeps moving while it fades.
+		pulseSlots?.forEach(slot => {
+			if (slot.majorEls.length === 0 && !slot.sideEl) return
+			const t = pulseTransforms(slot.blobs, frame, options)
+			slot.el.style.transform = `translate(-50%, -50%) scale(${t.layerScale})`
+			if (slot.sideEl) slot.sideEl.style.transform = `scale(${t.sideScale})`
+			slot.majorEls.forEach((el, i) => {
+				const p = t.majors[i]
+				if (!p) return
+				el.style.transform = `translate(${p.dx}cqw, ${p.dy}cqh) scale(${p.scale})`
+				el.style.opacity = `${p.opacity}`
+			})
 		})
 	}
 
@@ -217,34 +255,23 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		if (!frame) {
 			if (!pulseFrame) return
 			pulseFrame = null
-			if (pulseLayer) pulseLayer.style.opacity = '0'
+			pulseSlots?.forEach(slot => {
+				slot.el.style.opacity = '0'
+				scheduleSlotClear(slot)
+			})
 			if (hasApplied) active.style.opacity = RESTING_OPACITY
-			// Drop the composited children once faded out so they don't hold GPU memory.
-			pulseTeardown = setTimeout(() => {
-				pulseTeardown = null
-				if (!pulseFrame) pulseLayer?.replaceChildren()
-			}, options.fadeMs + 50)
 			return
 		}
 
 		const entering = !pulseFrame
 		pulseFrame = frame
 		if (entering) {
-			if (pulseTeardown !== null) {
-				clearTimeout(pulseTeardown)
-				pulseTeardown = null
-			}
-			if (!pulseLayer) {
-				pulseLayer = document.createElement('div')
-				pulseLayer.setAttribute('aria-hidden', 'true')
-				stylePulseLayer(pulseLayer, options)
-				parent.insertBefore(pulseLayer, img)
-			}
+			const slots = ensurePulseSlots()
 			// Always rebuild on entry: colours/options may have changed while the
 			// previous children were fading out.
-			buildPulseChildren()
+			fillPulseSlot(slots[activePulse])
 			if (hasApplied) {
-				pulseLayer.style.opacity = RESTING_OPACITY
+				slots[activePulse].el.style.opacity = RESTING_OPACITY
 				active.style.opacity = '0'
 			}
 		}
@@ -263,7 +290,7 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 			}
 			styleLayer(layerA, options)
 			styleLayer(layerB, options)
-			if (pulseLayer) stylePulseLayer(pulseLayer, options)
+			pulseSlots?.forEach(slot => stylePulseLayer(slot.el, options))
 			const needsExtract = Object.keys(patch).some(k => EXTRACTION_KEYS.includes(k as keyof GlowOptions))
 			schedule(needsExtract)
 		},
@@ -280,10 +307,12 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		destroy() {
 			img.removeEventListener('load', onLoad)
 			if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
-			if (pulseTeardown !== null) clearTimeout(pulseTeardown)
 			layerA.remove()
 			layerB.remove()
-			pulseLayer?.remove()
+			pulseSlots?.forEach(slot => {
+				if (slot.clearTimer !== null) clearTimeout(slot.clearTimer)
+				slot.el.remove()
+			})
 		},
 	}
 }
@@ -296,6 +325,16 @@ function createLayer(opts: Required<GlowOptions>): HTMLDivElement {
 }
 
 const RESTING_OPACITY = '0.8'
+
+/** One buffer of the double-buffered pulse layer. */
+interface PulseSlot {
+	el: HTMLDivElement
+	blobs: GlowBlob[]
+	/** Aligned with the major blobs in `blobs`, in rank order. */
+	majorEls: HTMLDivElement[]
+	sideEl: HTMLDivElement | null
+	clearTimer: ReturnType<typeof setTimeout> | null
+}
 
 function createPulseChild(blur: number): HTMLDivElement {
 	const el = document.createElement('div')

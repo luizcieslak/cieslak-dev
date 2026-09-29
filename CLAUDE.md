@@ -105,7 +105,15 @@ Each surface calls `getRadioPlayer(audio, api)` to grab the singleton, then `sub
 
 ### Audio-Reactive Glow (opt-in analysis tap)
 
-The [AmbientGlowSandbox](src/components/AmbientGlowSandbox.astro) in the lofi post can pulse with the live stream. Three layers make it work:
+Two surfaces can pulse with the live stream:
+- the [AmbientGlowSandbox](src/components/AmbientGlowSandbox.astro) in the lofi post, with a spectrum and an amount slider;
+- the `/radio` page's cover glow, via a "✨ Pulse" toggle that's hidden where analysis can't work.
+
+Both drive their glow through [src/lib/glow-pulse-driver.ts](src/lib/glow-pulse-driver.ts), which owns the rAF loop, the silence-fed tail and `requestTap()`, the one sanctioned tap sequence.
+
+On `/radio`, once the session is tapped (here or in the sandbox), the glow pulses by default. Two things override that: the session-scoped on/off intent (`window.__radioPulseIntent`, survives client-side navigation), and `prefers-reduced-motion`, which defaults it off. Pulse layers are double-buffered, so track changes crossfade.
+
+The underlying layers:
 
 - **[src/lib/audio-pulse.ts](src/lib/audio-pulse.ts)** is pure feature extraction from `AnalyserNode` byte arrays: loudness, 8 log-spaced bands with a noise gate and AGC, beats from low-end spectral flux, and spectral centroid. It's unit-tested.
 - **[src/lib/ambient-glow/index.ts](src/lib/ambient-glow/index.ts)** handles pulse rendering. `glow.setPulse(frame)` swaps the static layers for one element per major blob (plus one for the side blooms). Each frame writes only `transform`/`opacity` (compositor-only), and `setPulse(null)` swaps back. The static `buildGradient` output is golden-tested to stay byte-identical, and `pulseAmount` scales the effect (0 = static).

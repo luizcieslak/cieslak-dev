@@ -35,6 +35,8 @@ export const ui = {
 		'radio.playlistOn': "Listen to this radio's playlist on",
 		'radio.listenerCount.one': 'listener',
 		'radio.listenerCount.many': 'listeners',
+		'radio.pulse': 'Pulse',
+		'radio.pulse.hint': 'Make the glow pulse with the music',
 		'glow.randomize': 'Randomize',
 		'glow.pulse.title': 'Make it pulse',
 		'glow.pulse.hint':
@@ -68,6 +70,8 @@ export const ui = {
 		'radio.playlistOn': 'Ouça a playlist desta rádio no',
 		'radio.listenerCount.one': 'ouvinte',
 		'radio.listenerCount.many': 'ouvintes',
+		'radio.pulse': 'Pulsar',
+		'radio.pulse.hint': 'Fazer o brilho pulsar com a música',
 		'glow.randomize': 'Aleatório',
 		'glow.pulse.title': 'Faça pulsar',
 		'glow.pulse.hint':

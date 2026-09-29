@@ -207,3 +207,28 @@ test('music resuming after silence is not mistaken for a kick', () => {
 	for (let f = 0; f < 30; f++) if (analyzer.step(music, sine(0.3), FRAME_MS).beat === 1) beats++
 	assert.equal(beats, 0)
 })
+
+import { isAtRest } from '../src/lib/audio-pulse.ts'
+
+test('isAtRest: only when level, beat and every band have decayed', () => {
+	const rest = { level: 0.005, beat: 0, bands: [0, 0.009], centroid: 0.7, time: 3 }
+	assert.equal(isAtRest(rest), true)
+	assert.equal(isAtRest({ ...rest, level: 0.02 }), false)
+	assert.equal(isAtRest({ ...rest, beat: 0.5 }), false)
+	assert.equal(isAtRest({ ...rest, bands: [0, 0.2] }), false)
+})
+
+test('a paused analyzer fed silence reaches rest within a couple of seconds', () => {
+	const analyzer = createPulseAnalyzer({ bandCount: 8, sampleRate: SAMPLE_RATE, fftSize: FFT })
+	run(
+		analyzer,
+		Array.from({ length: 60 }, () => [spectrum(40, 3000, 200), sine(0.5)]),
+	)
+	assert.equal(isAtRest(analyzer.current), false)
+	let frames = 0
+	while (!isAtRest(analyzer.current) && frames < 600) {
+		analyzer.step(SILENT_FREQ, SILENT_TIME, FRAME_MS)
+		frames++
+	}
+	assert.ok(frames < 150, `took ${frames} frames to settle`)
+})

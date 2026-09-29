@@ -33,6 +33,8 @@ export type RadioPlayer = {
 	canAnalyse: () => boolean
 }
 
+export type AnalysisFailure = Extract<AnalysisResult, { ok: false }>['reason']
+
 export type AnalysisResult =
 	| { ok: true; analyser: AnalyserNode }
 	/**

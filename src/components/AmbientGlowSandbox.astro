@@ -111,12 +111,16 @@ try {
 
 <script>
 	import { bandForRank, mount, type GlowHandle, type GlowOptions } from '../lib/ambient-glow'
-	import { createPulseAnalyzer, type PulseAnalyzer, type PulseFrame } from '../lib/audio-pulse'
-	import { getRadioPlayer, type AnalysisResult, type RadioPlayer, type RadioState } from '../lib/radio-player'
+	import type { PulseFrame } from '../lib/audio-pulse'
+	import { createPulseDriver, type PulseDriver } from '../lib/glow-pulse-driver'
+	import {
+		getRadioPlayer,
+		type AnalysisFailure,
+		type RadioPlayer,
+		type RadioState,
+	} from '../lib/radio-player'
 
 	const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
-	const BAND_COUNT = 8
-	const REST_EPSILON = 0.01
 
 	type ControlKey = keyof GlowOptions
 
@@ -207,10 +211,6 @@ try {
 		return row
 	}
 
-	function isAtRest(frame: PulseFrame): boolean {
-		return frame.level < REST_EPSILON && frame.beat < REST_EPSILON && frame.bands.every(b => b < REST_EPSILON)
-	}
-
 	/**
 	 * Wires one sandbox to the radio: the explicit pulse button (the only thing
 	 * allowed to tap the audio, see RadioPlayer.enableAnalysis), the rAF loop
@@ -235,46 +235,25 @@ try {
 		const canvas = root.querySelector<HTMLCanvasElement>('.ambient-glow-sandbox-spectrum')!
 		const canvasCtx = canvas.getContext('2d')
 
-		let analyser = player.getAnalyser()
-		let pulse: PulseAnalyzer | null = null
-		let freq = new Uint8Array(0)
-		let time = new Uint8Array(0)
 		let state: RadioState = player.getState()
 		let connecting = false
 		// Known up front on Safari/iOS: never offer a click that can't work (and
 		// would only start the radio).
-		let failure: Extract<AnalysisResult, { ok: false }>['reason'] | null =
-			analyser || player.canAnalyse() ? null : 'unsupported'
-		let inView = false
-		let rafId: number | null = null
-		let lastTs = 0
+		let failure: AnalysisFailure | null = player.getAnalyser() || player.canAnalyse() ? null : 'unsupported'
 		// Per band: the colour of the blob it drives, or null if no blob follows it.
 		let barColors: Array<string | null> = []
 		let textColor = ''
 		let framesSinceColors = Infinity
 
-		const useAnalyser = (node: AnalyserNode) => {
-			analyser = node
-			pulse = createPulseAnalyzer({
-				bandCount: BAND_COUNT,
-				sampleRate: node.context.sampleRate,
-				fftSize: node.fftSize,
-			})
-			freq = new Uint8Array(node.frequencyBinCount)
-			time = new Uint8Array(node.fftSize)
-		}
-		if (analyser) useAnalyser(analyser)
-
-		// Stopping without the silence-fed tail (off-screen, amount 0) would freeze
-		// the envelopes mid-swell and replay them later; start from rest instead.
-		const resetEnvelopes = () => {
-			if (analyser) useAnalyser(analyser)
-		}
+		// Assigned below; player.subscribe() inside createPulseDriver calls onState
+		// synchronously, before the assignment, so render() must tolerate its absence.
+		let driver: PulseDriver | null = null
+		const tapped = () => driver?.hasAnalyser() ?? false
 
 		const render = () => {
 			// Only "blocked" is worth retrying; unsupported/failed won't change on a new click.
 			toggle.disabled = connecting || failure === 'unsupported' || failure === 'failed'
-			if (!analyser) {
+			if (!tapped()) {
 				toggle.textContent = labels.labelEnable ?? ''
 				if (connecting) status.textContent = labels.labelConnecting ?? ''
 				else if (failure === 'blocked') status.textContent = labels.labelBlocked ?? ''
@@ -297,11 +276,11 @@ try {
 			}
 		}
 
-		const refreshColors = () => {
+		const refreshColors = (bandCount: number) => {
 			const majors = glow.getBlobs().filter(blob => blob.kind === 'major')
-			barColors = new Array<string | null>(BAND_COUNT).fill(null)
+			barColors = new Array<string | null>(bandCount).fill(null)
 			majors.forEach(({ rank, color }) => {
-				barColors[bandForRank(rank, majors.length, BAND_COUNT)] = `rgb(${color.r},${color.g},${color.b})`
+				barColors[bandForRank(rank, majors.length, bandCount)] = `rgb(${color.r},${color.g},${color.b})`
 			})
 			textColor = getComputedStyle(canvas).color
 		}
@@ -319,7 +298,7 @@ try {
 			// Colours only change with the image/options/theme; refresh twice a second.
 			if (framesSinceColors++ > 30) {
 				framesSinceColors = 0
-				refreshColors()
+				refreshColors(frame.bands.length)
 			}
 			canvasCtx.clearRect(0, 0, w, h)
 			const gap = 4 * dpr
@@ -339,98 +318,49 @@ try {
 			canvasCtx.globalAlpha = 1
 		}
 
-		const tick = (ts: number) => {
-			rafId = null
-			if (!analyser || !pulse) return
-			if (!inView || getAmount() === 0) {
-				// Off-screen, or motion turned off: stop without a tail.
-				lastTs = 0
-				resetEnvelopes()
-				glow.setPulse(null)
-				return
-			}
-			const dt = lastTs ? ts - lastTs : 1000 / 60
-			lastTs = ts
-			const live = state.playing
-			if (live) {
-				analyser.getByteFrequencyData(freq)
-				analyser.getByteTimeDomainData(time)
-			} else {
-				// Paused: feed silence so the envelopes ease the glow back to rest.
-				freq.fill(0)
-				time.fill(128)
-			}
-			const frame = pulse.step(freq, time, dt)
-			drawSpectrum(frame)
-			if (!live && isAtRest(frame)) {
-				lastTs = 0
-				glow.setPulse(null)
-				return
-			}
-			glow.setPulse(frame)
-			rafId = requestAnimationFrame(tick)
-		}
-
-		const ensureLoop = () => {
-			if (rafId !== null || !analyser || !pulse || !inView || getAmount() === 0) return
-			if (!state.playing && isAtRest(pulse.current)) return
-			rafId = requestAnimationFrame(tick)
-		}
-
-		const unsubscribe = player.subscribe(next => {
-			state = next
-			render()
-			ensureLoop()
+		const pulseDriver = createPulseDriver({
+			glow,
+			player,
+			observe: root,
+			getAmount,
+			onFrame: drawSpectrum,
+			onState: next => {
+				state = next
+				render()
+			},
 		})
-
-		// Pause the loop while the sandbox is off-screen; rAF already stops in hidden tabs.
-		const observer = new IntersectionObserver(entries => {
-			inView = entries.some(entry => entry.isIntersecting)
-			ensureLoop()
-		})
-		observer.observe(root)
 
 		toggle.addEventListener(
 			'click',
 			() => {
-				if (analyser) {
+				if (tapped()) {
 					player.toggle()
 					return
 				}
 				if (failure === 'unsupported' || failure === 'failed') return
-				// The only place the radio audio gets tapped. enableAnalysis() must run
-				// before toggle() inside this gesture so the AudioContext may start and
-				// the stream opens in CORS mode straight away.
-				const pending = player.enableAnalysis()
-				if (!state.wantPlaying) player.toggle()
 				connecting = true
 				failure = null
+				const pending = pulseDriver.requestTap()
 				render()
 				void pending.then(result => {
 					connecting = false
 					if (signal.aborted) return
-					if (result.ok) useAnalyser(result.analyser)
-					else failure = result.reason
+					if (!result.ok) failure = result.reason
 					render()
-					ensureLoop()
 				})
 			},
 			{ signal },
 		)
 
+		driver = pulseDriver
 		render()
 
 		return {
 			refresh: () => {
 				render()
-				ensureLoop()
+				pulseDriver.refresh()
 			},
-			cleanup: () => {
-				unsubscribe()
-				observer.disconnect()
-				if (rafId !== null) cancelAnimationFrame(rafId)
-				glow.setPulse(null)
-			},
+			cleanup: () => pulseDriver.destroy(),
 		}
 	}
 

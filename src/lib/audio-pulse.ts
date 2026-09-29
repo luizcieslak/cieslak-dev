@@ -218,3 +218,10 @@ export function createPulseAnalyzer(options: PulseAnalyzerOptions): PulseAnalyze
 function clamp01(v: number): number {
 	return v < 0 ? 0 : v > 1 ? 1 : v
 }
+
+const REST_EPSILON = 0.01
+
+/** True once every envelope has decayed to (visually) zero. */
+export function isAtRest(frame: PulseFrame): boolean {
+	return frame.level < REST_EPSILON && frame.beat < REST_EPSILON && frame.bands.every(b => b < REST_EPSILON)
+}
