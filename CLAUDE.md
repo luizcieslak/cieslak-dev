@@ -121,7 +121,7 @@ On `/radio`, once the session is tapped (here or in the sandbox), the glow pulse
 
 Drift and pulse compose. While pulsing, the 24fps static drift repaint stops and each pulse child adds its drift as a translate: the delta between `computeBlobs(colors, opts, phase)` and the phase-0 geometry, so clamping matches the static render. Everything stays compositor-only.
 
-**Pulse experiments** (for comparing approaches in the browser). These work on `/radio` and in the blog sandbox; in the sandbox, any of them also shows a live control panel with a link that opens `/radio` with the same settings.
+**Pulse experiments** (for comparing approaches in the browser). These work on `/radio` and in the blog sandbox. In the sandbox, any of them also shows a live control panel with a link that opens `/radio` with the same settings, and swaps the demo image for the radio's current album cover, following track changes. Upload or Randomize turns that off; the panel's checkbox turns it back on.
 - `?pulseMode=` chooses the behaviour (`PULSE_MODES` in [ambient-glow](src/lib/ambient-glow/index.ts)):
   - `bands` (default): each blob swells with its own frequency band.
   - `kick`: a big whole-glow thump on kicks.

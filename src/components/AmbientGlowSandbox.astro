@@ -395,7 +395,15 @@ try {
 		onKnob: (key: PulseKnob, value: number) => void
 		onSmooth: (value: number) => void
 		onDetection: (detection: Partial<DrumDetection>) => void
+		/** Whether the sandbox image follows the radio's current album cover. */
+		followCover: boolean
+		onFollowCover: (follow: boolean) => void
 		signal: AbortSignal
+	}
+
+	interface ExperimentPanel {
+		/** Reflect a follow-cover change made elsewhere (upload / randomize). */
+		setFollowCover: (follow: boolean) => void
 	}
 
 	/**
@@ -404,9 +412,9 @@ try {
 	 * Every change is mirrored into the URL (replaceState), and there's a link that
 	 * opens /radio with the same settings.
 	 */
-	function buildExperimentPanel(root: HTMLElement, options: ExperimentPanelOptions) {
+	function buildExperimentPanel(root: HTMLElement, options: ExperimentPanelOptions): ExperimentPanel | null {
 		const host = root.querySelector<HTMLElement>('.ambient-glow-sandbox-pulse')
-		if (!host) return
+		if (!host) return null
 		const state = {
 			mode: options.mode,
 			knobs: { ...options.knobs },
@@ -427,6 +435,22 @@ try {
 		for (const mode of PULSE_MODES) select.add(new Option(mode, mode, false, mode === state.mode))
 		modeRow.append(select)
 		panel.append(modeRow)
+
+		// Tune against the song's own cover, like /radio shows it.
+		const coverRow = document.createElement('label')
+		coverRow.className = 'flex items-center gap-3'
+		coverRow.innerHTML = `<span class="w-20 shrink-0 opacity-80">Cover</span>`
+		const followCover = document.createElement('input')
+		followCover.type = 'checkbox'
+		followCover.checked = options.followCover
+		const coverLabel = document.createElement('span')
+		coverLabel.className = 'opacity-80'
+		coverLabel.textContent = 'Use current album cover'
+		coverRow.append(followCover, coverLabel)
+		panel.append(coverRow)
+		followCover.addEventListener('change', () => options.onFollowCover(followCover.checked), {
+			signal: options.signal,
+		})
 
 		const link = document.createElement('a')
 		link.className = 'justify-self-start underline opacity-80 hover:opacity-100'
@@ -525,6 +549,11 @@ try {
 		panel.append(link)
 		host.append(panel)
 		sync()
+		return {
+			setFollowCover: follow => {
+				followCover.checked = follow
+			},
+		}
 	}
 
 	document.addEventListener('astro:page-load', () => {
@@ -655,11 +684,20 @@ try {
 			)
 
 			let lastObjectUrl: string | null = null
+			// Experiment mode: follow the radio's current album cover (see below).
+			// Picking an image yourself (upload / randomize) turns that off.
+			let followCover = false
+			let experimentPanel: ExperimentPanel | null = null
+			const stopFollowingCover = () => {
+				followCover = false
+				experimentPanel?.setFollowCover(false)
+			}
 			upload.addEventListener(
 				'change',
 				() => {
 					const file = upload.files?.[0]
 					if (!file) return
+					stopFollowingCover()
 					if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl)
 					lastObjectUrl = URL.createObjectURL(file)
 					img.removeAttribute('crossorigin')
@@ -682,6 +720,7 @@ try {
 						input.dispatchEvent(new Event('change', { bubbles: true }))
 					})
 
+					stopFollowingCover()
 					// Switch to a different demo cover (skip the one already showing).
 					const choices = demoImages.filter(src => !img.src.endsWith(src))
 					const pool = choices.length ? choices : demoImages
@@ -698,21 +737,34 @@ try {
 				{ signal },
 			)
 
-			pulseBinding = audio
-				? bindPulse(
-						root,
-						glow,
-						getRadioPlayer(audio, RADIO_API),
-						() => pulseAmount,
-						signal,
-						experiment.smooth,
-						experiment.detection,
-					)
-				: null
+			const player = audio ? getRadioPlayer(audio, RADIO_API) : null
+			pulseBinding =
+				audio && player
+					? bindPulse(root, glow, player, () => pulseAmount, signal, experiment.smooth, experiment.detection)
+					: null
 
-			if (pulseBinding && hasPulseExperiment(urlParams)) {
+			const showCurrentCover = () => {
+				const track = player?.getState().track
+				const cover = track?.albumArtUrl || track?.coverUrl
+				// Tracks without art keep whatever image is showing.
+				if (!cover || img.src === cover) return
+				if (lastObjectUrl) {
+					URL.revokeObjectURL(lastObjectUrl)
+					lastObjectUrl = null
+				}
+				img.setAttribute('crossorigin', 'anonymous')
+				img.src = cover
+				img.alt = track?.title ? `${track.title} cover` : ''
+			}
+			let unsubscribeCover: (() => void) | null = null
+
+			if (pulseBinding && player && hasPulseExperiment(urlParams)) {
 				const binding = pulseBinding
-				buildExperimentPanel(root, {
+				followCover = true
+				unsubscribeCover = player.subscribe(() => {
+					if (followCover) showCurrentCover()
+				})
+				experimentPanel = buildExperimentPanel(root, {
 					mode: experiment.mode ?? 'bands',
 					knobs: experiment.knobs,
 					smooth: experiment.smooth ?? 1,
@@ -722,11 +774,17 @@ try {
 					onKnob: (key, value) => glow.setOptions({ [key]: value }),
 					onSmooth: value => binding.setSmoothing(value),
 					onDetection: next => binding.setDetection(next),
+					followCover,
+					onFollowCover: follow => {
+						followCover = follow
+						if (follow) showCurrentCover()
+					},
 					signal,
 				})
 			}
 
 			cleanups.push(() => {
+				unsubscribeCover?.()
 				pulseBinding?.cleanup()
 				controller.abort()
 				if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
