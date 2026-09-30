@@ -211,11 +211,24 @@ test('music resuming after silence is not mistaken for a kick', () => {
 import { isAtRest } from '../src/lib/audio-pulse.ts'
 
 test('isAtRest: only when level, beat and every band have decayed', () => {
-	const rest = { level: 0.005, beat: 0, bands: [0, 0.009], centroid: 0.7, time: 3 }
+	const rest = {
+		level: 0.005,
+		swell: 0.004,
+		beat: 0,
+		snare: 0.002,
+		bands: [0, 0.009],
+		onsets: [0.001, 0],
+		orbit: 12.3,
+		centroid: 0.7,
+		time: 3,
+	}
 	assert.equal(isAtRest(rest), true)
 	assert.equal(isAtRest({ ...rest, level: 0.02 }), false)
 	assert.equal(isAtRest({ ...rest, beat: 0.5 }), false)
 	assert.equal(isAtRest({ ...rest, bands: [0, 0.2] }), false)
+	assert.equal(isAtRest({ ...rest, snare: 0.4 }), false)
+	assert.equal(isAtRest({ ...rest, onsets: [0.3, 0] }), false)
+	assert.equal(isAtRest({ ...rest, swell: 0.2 }), false)
 })
 
 test('a paused analyzer fed silence reaches rest within a couple of seconds', () => {
@@ -231,4 +244,124 @@ test('a paused analyzer fed silence reaches rest within a couple of seconds', ()
 		frames++
 	}
 	assert.ok(frames < 150, `took ${frames} frames to settle`)
+})
+
+// --- boom bap: kick vs snare vs hat -----------------------------------------
+
+/** Spectrum with several [loHz, hiHz, value] regions over a base level. */
+function mix(regions, base = 60) {
+	const out = new Uint8Array(BINS).fill(base)
+	for (const [lo, hi, value] of regions) {
+		for (let i = 0; i < BINS; i++) {
+			const hz = i * HZ_PER_BIN
+			if (hz >= lo && hz < hi) out[i] = Math.max(out[i], value)
+		}
+	}
+	return out
+}
+// A mellow sample bed that is always there.
+const BED = mix([[300, 3000, 110]])
+const KICK = mix([
+	[300, 3000, 110],
+	[40, 140, 245],
+])
+const SNARE = mix([
+	[300, 3000, 110],
+	[180, 350, 235],
+	[1500, 5000, 225],
+])
+const HAT = mix([
+	[300, 3000, 110],
+	[7000, 12000, 230],
+])
+
+/** Play a pattern (one hit name per 30-frame step, 500ms) and count impulses. */
+function play(pattern) {
+	const analyzer = createPulseAnalyzer({ bandCount: 8, sampleRate: SAMPLE_RATE, fftSize: FFT })
+	const hits = { beat: 0, snare: 0, onsetLow: 0, onsetHigh: 0 }
+	const prev = { beat: 0, snare: 0, onsetLow: 0, onsetHigh: 0 }
+	run(
+		analyzer,
+		Array.from({ length: 40 }, () => [BED, sine(0.3)]),
+	)
+	for (const hit of pattern) {
+		for (let f = 0; f < 30; f++) {
+			const spectrum = f === 0 && hit ? { kick: KICK, snare: SNARE, hat: HAT }[hit] : BED
+			const frame = analyzer.step(spectrum, sine(0.3), FRAME_MS)
+			const now = {
+				beat: frame.beat,
+				snare: frame.snare,
+				onsetLow: frame.onsets[0],
+				onsetHigh: frame.onsets[7],
+			}
+			for (const key of Object.keys(now)) {
+				if (now[key] === 1 && prev[key] !== 1) hits[key]++
+				prev[key] = now[key]
+			}
+		}
+	}
+	return hits
+}
+
+test('kicks fire beat and the low-band onset, not the snare', () => {
+	const hits = play(['kick', null, 'kick', null, 'kick', null, 'kick', null])
+	assert.ok(hits.beat >= 3, `beats ${hits.beat}`)
+	assert.equal(hits.snare, 0)
+	assert.equal(hits.onsetHigh, 0)
+})
+
+test('snares fire the snare detector, not the kick', () => {
+	const hits = play([null, 'snare', null, 'snare', null, 'snare', null, 'snare'])
+	assert.ok(hits.snare >= 3, `snares ${hits.snare}`)
+	assert.equal(hits.beat, 0)
+})
+
+test('hats fire only the top-band onset', () => {
+	const hits = play(['hat', 'hat', 'hat', 'hat', 'hat', 'hat', 'hat', 'hat'])
+	assert.ok(hits.onsetHigh >= 3, `hat onsets ${hits.onsetHigh}`)
+	assert.equal(hits.beat, 0)
+	assert.equal(hits.snare, 0)
+	assert.equal(hits.onsetLow, 0)
+})
+
+test('a boom-bap bar separates boom from bap', () => {
+	const hits = play(['kick', 'snare', 'kick', 'snare', 'kick', 'snare', 'kick', 'snare'])
+	assert.ok(hits.beat >= 3 && hits.snare >= 3, JSON.stringify(hits))
+})
+
+test('orbit only turns with music, and swell is slower than level', () => {
+	const analyzer = createPulseAnalyzer({ bandCount: 8, sampleRate: SAMPLE_RATE, fftSize: FFT })
+	run(
+		analyzer,
+		Array.from({ length: 60 }, () => [SILENT_FREQ, SILENT_TIME]),
+	)
+	assert.equal(analyzer.current.orbit, 0)
+	const after = run(
+		analyzer,
+		Array.from({ length: 15 }, () => [BED, sine(0.5)]),
+	)
+	assert.ok(after.orbit > 0)
+	assert.ok(after.swell < after.level, `swell ${after.swell} vs level ${after.level}`)
+	const settled = run(
+		analyzer,
+		Array.from({ length: 240 }, () => [BED, sine(0.5)]),
+	)
+	assert.ok(Math.abs(settled.swell - settled.level) < 0.05, 'swell catches up when sustained')
+})
+
+test('setSmoothing slows the release', () => {
+	const decayAfter = scale => {
+		const analyzer = createPulseAnalyzer({ bandCount: 8, sampleRate: SAMPLE_RATE, fftSize: FFT })
+		analyzer.setSmoothing(scale)
+		run(
+			analyzer,
+			Array.from({ length: 60 }, () => [spectrum(40, 70, 220), sine(0.5)]),
+		)
+		return run(
+			analyzer,
+			Array.from({ length: 12 }, () => [BED, sine(0.05)]),
+		).level
+	}
+	assert.ok(decayAfter(3) > decayAfter(1), 'smoother holds the level longer')
+	assert.ok(decayAfter(1) > decayAfter(0.4))
 })

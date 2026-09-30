@@ -25,6 +25,18 @@ export interface GlowOptions {
 	sideBloomRadius?: number
 	/** How strongly setPulse() frames deform the glow; 0 = static. */
 	pulseAmount?: number
+	/** Which audio-reactive behaviour setPulse() frames drive (see PULSE_MODES). */
+	pulseMode?: PulseMode
+	/**
+	 * Per-feature multipliers for experimenting (1 = the mode's default). Bass and
+	 * treble weight the low/high bands, kick and snare the drum impulses, and
+	 * shimmer the positional wobble.
+	 */
+	pulseBass?: number
+	pulseTreble?: number
+	pulseKick?: number
+	pulseSnare?: number
+	pulseShimmer?: number
 	/**
 	 * Per-blob drift amplitude, in the same percentage units as `jitter`. 0 (the
 	 * default) disables the animation entirely and renders exactly as before.
@@ -95,6 +107,12 @@ const DEFAULTS: Required<GlowOptions> = {
 	sideBloomOpacity: 0.32,
 	sideBloomRadius: 42,
 	pulseAmount: 1,
+	pulseMode: 'bands',
+	pulseBass: 1,
+	pulseTreble: 1,
+	pulseKick: 1,
+	pulseSnare: 1,
+	pulseShimmer: 1,
 	drift: 0,
 	driftSpeed: 1,
 }
@@ -285,6 +303,7 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 			const t = pulseTransforms(slot.blobs, frame, options)
 			const drift = phase !== 0 ? driftDelta(slot.blobs, slot.colors, slot.opts, phase) : null
 			slot.el.style.transform = `translate(-50%, -50%) scale(${t.layerScale})`
+			slot.el.style.filter = t.filter
 			let majorIndex = 0
 			slot.blobs.forEach((blob, i) => {
 				const el = slot.els[i]
@@ -376,10 +395,10 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		},
 		setOptions(patch) {
 			options = { ...options, ...patch }
-			// pulseAmount only scales the per-frame transforms: no geometry, no
-			// rebuild, no crossfade. Just re-render the current frame.
+			// The pulse options only change the per-frame transforms: no geometry,
+			// no rebuild, no crossfade. Just re-render the current frame.
 			const keys = Object.keys(patch)
-			if (keys.length > 0 && keys.every(k => k === 'pulseAmount')) {
+			if (keys.length > 0 && keys.every(k => k.startsWith('pulse'))) {
 				if (pulseFrame) renderPulse(pulseFrame)
 				return
 			}
@@ -752,6 +771,27 @@ export interface GlowPulse {
 	/** Aligned with the major blobs, in rank order. */
 	majors: BlobPulse[]
 	sideScale: number
+	/** CSS filter for the whole pulse layer ('none' when unused). */
+	filter: string
+}
+
+/**
+ * The experimental audio-reactive behaviours, selectable per mount (and via the
+ * `?pulseMode=` URL param on /radio and the sandbox). All of them are the
+ * identity on a silent frame.
+ * - bands: each blob swells with its own frequency band (the original).
+ * - kick: mostly still; a big whole-glow thump on each detected kick.
+ * - transients: blobs pop on sudden hits in their band, not sustained energy.
+ * - colour: brightness shifts hue/saturation/brightness; size barely moves.
+ * - breathe: one slow, smoothed swell with the loudness.
+ * - orbit: blobs circle the cover at a speed set by treble and kicks.
+ * - boombap: kick thumps, snare flashes and spreads, hats sparkle the small blobs.
+ */
+export const PULSE_MODES = ['bands', 'kick', 'transients', 'colour', 'breathe', 'orbit', 'boombap'] as const
+export type PulseMode = (typeof PULSE_MODES)[number]
+
+export function isPulseMode(value: unknown): value is PulseMode {
+	return typeof value === 'string' && (PULSE_MODES as readonly string[]).includes(value)
 }
 
 /**
@@ -774,7 +814,15 @@ export function pulseTransforms(
 	opts: Required<GlowOptions>,
 ): GlowPulse {
 	const a = Math.max(0, opts.pulseAmount)
-	const { bands, level, beat, centroid, time } = frame
+	const knob = (value: number) => (Number.isFinite(value) ? Math.max(0, value) : 1)
+	const k = {
+		bass: knob(opts.pulseBass),
+		treble: knob(opts.pulseTreble),
+		kick: knob(opts.pulseKick),
+		snare: knob(opts.pulseSnare),
+		shimmer: knob(opts.pulseShimmer),
+	}
+	const { bands, onsets, level, swell, beat, snare, orbit, centroid, time } = frame
 	const n = bands.length
 	const majors = blobs.filter(blob => blob.kind === 'major')
 	const trebleStart = Math.ceil((n * 2) / 3)
@@ -782,24 +830,140 @@ export function pulseTransforms(
 	for (let i = trebleStart; i < n; i++) treble += bands[i]
 	treble = n > trebleStart ? treble / (n - trebleStart) : 0
 	const bass = n ? bands[0] : 0
-	// Bright passages spread the blobs outwards, dull ones pull them in.
-	const spread = a * 0.25 * (centroid - 0.4) * level
+	const bandIndex = (rank: number) => (n ? bandForRank(rank, majors.length, n) : -1)
+	const bandOf = (rank: number) => bands[bandIndex(rank)] ?? 0
+	const onsetOf = (rank: number) => onsets[bandIndex(rank)] ?? 0
+	/** Blend of the bass and treble knobs by where the rank's band sits (0 = lowest). */
+	const bandWeight = (rank: number) => {
+		const position = n > 1 ? bandIndex(rank) / (n - 1) : 0
+		return k.bass + (k.treble - k.bass) * position
+	}
+	const still: BlobPulse = { scale: 1, dx: 0, dy: 0, opacity: 1 }
+	const base = { layerScale: 1, sideScale: 1, filter: 'none' }
 
-	return {
-		layerScale: 1 + a * (0.12 * level + 0.08 * beat),
-		sideScale: 1 + a * 0.2 * bass,
-		majors: majors.map(blob => {
-			const band = n ? bands[bandForRank(blob.rank, majors.length, n)] : 0
-			const kick = beat * (blob.rank === 0 ? 0.15 : 0.06)
-			const phase = time * (0.35 + 0.11 * blob.rank) * Math.PI * 2 + blob.rank * 1.7
-			const wobble = a * treble * (2 + opts.jitter * 0.12)
+	switch (opts.pulseMode) {
+		case 'kick':
 			return {
-				scale: 1 + a * (0.45 * band + kick),
-				dx: (blob.x - 50) * spread + Math.sin(phase) * wobble,
-				dy: Math.cos(phase * 0.8) * wobble * 0.6,
-				opacity: 1 - Math.min(1, a) * 0.35 * (1 - band) * level,
+				...base,
+				layerScale: 1 + a * (0.03 * level + 0.2 * beat * k.kick),
+				sideScale: 1 + a * 0.25 * beat * k.kick,
+				majors: majors.map(blob => ({
+					...still,
+					scale: 1 + a * beat * k.kick * (blob.rank === 0 ? 0.3 : 0.12),
+				})),
 			}
-		}),
+
+		case 'transients':
+			return {
+				...base,
+				layerScale: 1 + a * (0.04 * level + 0.06 * beat * k.kick),
+				sideScale: 1 + a * 0.2 * (onsets[0] ?? 0) * k.bass,
+				majors: majors.map(blob => {
+					const hit = onsetOf(blob.rank) * bandWeight(blob.rank)
+					return {
+						scale: 1 + a * 0.6 * hit,
+						// Pop outward from the centre on a hit.
+						dx: (blob.x - 50) * 0.1 * a * hit,
+						dy: (blob.y - 50) * 0.1 * a * hit,
+						// Blobs that aren't being hit sink back a little, so hits read as flickers.
+						opacity: 1 - Math.min(1, a) * 0.35 * (1 - Math.min(1, hit)) * level,
+					}
+				}),
+			}
+
+		case 'colour': {
+			// Scaled by level so a silent frame is the identity.
+			const hue = -40 * (centroid - 0.45) * level * a * k.treble
+			const saturate = 1 + a * (0.7 * bass * k.bass - 0.25 * treble * k.treble)
+			const brightness = 1 + a * (0.18 * level + 0.25 * snare * k.snare + 0.15 * beat * k.kick)
+			// 'none' rather than a no-op filter string: a filter costs compositor work.
+			const active = a > 0 && (level > 0 || beat > 0 || snare > 0 || bass > 0 || treble > 0)
+			return {
+				...base,
+				layerScale: 1 + a * 0.03 * level,
+				majors: majors.map(() => still),
+				filter: active
+					? `hue-rotate(${hue}deg) saturate(${Math.max(0, saturate)}) brightness(${brightness})`
+					: 'none',
+			}
+		}
+
+		case 'breathe':
+			return {
+				...base,
+				layerScale: 1 + a * 0.2 * swell,
+				sideScale: 1 + a * 0.1 * swell,
+				majors: majors.map(blob => {
+					const sway = Math.sin(time * 0.25 + blob.rank * 1.3) * a * 2 * swell * k.shimmer
+					return { ...still, scale: 1 + a * 0.15 * swell * (1 - blob.rank * 0.08), dx: sway, dy: sway * 0.5 }
+				}),
+			}
+
+		case 'orbit':
+			return {
+				...base,
+				layerScale: 1 + a * 0.05 * level,
+				majors: majors.map(blob => {
+					// Alternate directions and speeds per blob so they weave, not spin as one.
+					const direction = blob.rank % 2 === 0 ? 1 : -1
+					const angle = orbit * a * (0.6 + 0.15 * blob.rank) * direction
+					const rx = blob.x - 50
+					const ry = blob.y - 50
+					return {
+						...still,
+						scale: 1 + a * 0.2 * bandOf(blob.rank) * bandWeight(blob.rank),
+						dx: rx * Math.cos(angle) - ry * Math.sin(angle) - rx,
+						dy: rx * Math.sin(angle) + ry * Math.cos(angle) - ry,
+					}
+				}),
+			}
+
+		case 'boombap': {
+			const flash = snare * k.snare
+			return {
+				...base,
+				// Boom: the whole glow thumps on the kick, over a slow sway with the mix.
+				layerScale: 1 + a * (0.05 * swell + 0.14 * beat * k.kick),
+				// Bap: the side blooms and the brightness flash on the snare.
+				sideScale: 1 + a * 0.35 * flash,
+				filter: a > 0 && flash > 0.02 ? `brightness(${1 + a * 0.18 * flash})` : 'none',
+				majors: majors.map(blob => {
+					const hats = blob.rank >= majors.length / 2 ? onsetOf(blob.rank) * k.treble : 0
+					const phase = time * (0.5 + 0.13 * blob.rank) * Math.PI * 2 + blob.rank * 1.7
+					const wobble = a * hats * 1.5 * k.shimmer
+					return {
+						scale: 1 + a * ((blob.rank === 0 ? 0.35 : 0.08) * beat * k.kick + 0.15 * hats),
+						// The snare spreads the blobs outward; hats jitter the small ones.
+						dx: (blob.x - 50) * 0.12 * a * flash + Math.sin(phase) * wobble,
+						dy: (blob.y - 50) * 0.12 * a * flash + Math.cos(phase) * wobble * 0.6,
+						opacity: 1,
+					}
+				}),
+			}
+		}
+
+		default: {
+			// 'bands': the original behaviour (byte-identical with all knobs at 1).
+			// Bright passages spread the blobs outwards, dull ones pull them in.
+			const spread = a * 0.25 * (centroid - 0.4) * level
+			return {
+				...base,
+				layerScale: 1 + a * (0.12 * level + 0.08 * beat * k.kick),
+				sideScale: 1 + a * 0.2 * bass * k.bass,
+				majors: majors.map(blob => {
+					const band = bandOf(blob.rank) * bandWeight(blob.rank)
+					const kickBump = beat * k.kick * (blob.rank === 0 ? 0.15 : 0.06)
+					const phase = time * (0.35 + 0.11 * blob.rank) * Math.PI * 2 + blob.rank * 1.7
+					const wobble = a * treble * (2 + opts.jitter * 0.12) * k.shimmer
+					return {
+						scale: 1 + a * (0.45 * band + kickBump),
+						dx: (blob.x - 50) * spread + Math.sin(phase) * wobble,
+						dy: Math.cos(phase * 0.8) * wobble * 0.6,
+						opacity: 1 - Math.min(1, a) * 0.35 * (1 - Math.min(1, band)) * level,
+					}
+				}),
+			}
+		}
 	}
 }
 

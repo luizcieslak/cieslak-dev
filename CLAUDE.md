@@ -121,6 +121,22 @@ On `/radio`, once the session is tapped (here or in the sandbox), the glow pulse
 
 Drift and pulse compose. While pulsing, the 24fps static drift repaint stops and each pulse child adds its drift as a translate: the delta between `computeBlobs(colors, opts, phase)` and the phase-0 geometry, so clamping matches the static render. Everything stays compositor-only.
 
+**Pulse experiments** (for comparing approaches in the browser). These work on `/radio` and in the blog sandbox; in the sandbox, any of them also shows a live control panel with a link that opens `/radio` with the same settings.
+- `?pulseMode=` chooses the behaviour (`PULSE_MODES` in [ambient-glow](src/lib/ambient-glow/index.ts)):
+  - `bands` (default): each blob swells with its own frequency band.
+  - `kick`: a big whole-glow thump on kicks.
+  - `transients`: blobs pop on sudden hits in their band.
+  - `colour`: hue, saturation and brightness shift instead of size.
+  - `breathe`: a slow loudness swell.
+  - `orbit`: blobs circle the cover, faster with treble and kicks.
+  - `boombap`: the kick thumps, the snare flashes and spreads, and the hats sparkle the small blobs.
+- `?pulseBass`, `pulseTreble`, `pulseKick`, `pulseSnare`, `pulseShimmer` (0–4): visual multipliers, default 1.
+- `?pulseSmooth` (0.25–4): release/decay scale.
+- `?pulseKickShape` (1–6, default 2) and `?pulseSnareStrict` (1–6, default 3.5): drum-detector thresholds.
+- Parsing lives in [src/lib/pulse-params.ts](src/lib/pulse-params.ts).
+
+Drum detection is imperfect by nature, since it works on a mixed-down spectrum. It classifies each sudden rise by how unusual it is per region (low / body / crack / air). [scripts/pulse-eval.mjs](scripts/pulse-eval.mjs) scores the detectors against a synthetic boom-bap loop with known hit times, and reports hit rates on real MP3s (`node scripts/pulse-eval.mjs song.mp3`). Re-run it when changing detection.
+
 The underlying layers:
 
 - **[src/lib/audio-pulse.ts](src/lib/audio-pulse.ts)** is pure feature extraction from `AnalyserNode` byte arrays: loudness, 8 log-spaced bands with a noise gate and AGC, beats from low-end spectral flux, and spectral centroid. It's unit-tested.

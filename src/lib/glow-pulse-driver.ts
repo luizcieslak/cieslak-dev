@@ -2,7 +2,13 @@
 // blog sandbox and the /radio page so the loop, the silence-fed tail and — most
 // importantly — the opt-in tap sequence live in exactly one place.
 import type { GlowHandle } from './ambient-glow'
-import { createPulseAnalyzer, isAtRest, type PulseAnalyzer, type PulseFrame } from './audio-pulse'
+import {
+	createPulseAnalyzer,
+	isAtRest,
+	type DrumDetection,
+	type PulseAnalyzer,
+	type PulseFrame,
+} from './audio-pulse'
 import type { AnalysisResult, RadioPlayer, RadioState } from './radio-player'
 
 const BAND_COUNT = 8
@@ -18,6 +24,10 @@ export interface PulseDriverOptions {
 	onFrame?: (frame: PulseFrame) => void
 	/** Called whenever the radio state changes. */
 	onState?: (state: RadioState) => void
+	/** Release/decay scale for the audio analyzer (see PulseAnalyzer.setSmoothing); default 1. */
+	smoothing?: number
+	/** Drum-detector threshold overrides (experiments). */
+	detection?: Partial<DrumDetection>
 }
 
 export interface PulseDriver {
@@ -31,11 +41,17 @@ export interface PulseDriver {
 	requestTap(): Promise<AnalysisResult>
 	/** Re-read getAmount() and start/stop the loop accordingly. */
 	refresh(): void
+	/** Change the analyzer's release/decay scale live. */
+	setSmoothing(scale: number): void
+	/** Change drum-detector thresholds live (restarts detection from rest). */
+	setDetection(detection: Partial<DrumDetection>): void
 	destroy(): void
 }
 
 export function createPulseDriver(options: PulseDriverOptions): PulseDriver {
 	const { glow, player, observe, getAmount, onFrame, onState } = options
+	let smoothing = options.smoothing ?? 1
+	let detection = options.detection ?? {}
 
 	let analyser: AnalyserNode | null = null
 	let pulse: PulseAnalyzer | null = null
@@ -53,7 +69,9 @@ export function createPulseDriver(options: PulseDriverOptions): PulseDriver {
 			bandCount: BAND_COUNT,
 			sampleRate: node.context.sampleRate,
 			fftSize: node.fftSize,
+			detection,
 		})
+		pulse.setSmoothing(smoothing)
 		freq = new Uint8Array(node.frequencyBinCount)
 		time = new Uint8Array(node.fftSize)
 	}
@@ -139,6 +157,14 @@ export function createPulseDriver(options: PulseDriverOptions): PulseDriver {
 			})
 		},
 		refresh: ensureLoop,
+		setSmoothing(scale) {
+			smoothing = scale
+			pulse?.setSmoothing(scale)
+		},
+		setDetection(next) {
+			detection = next
+			if (analyser) useAnalyser(analyser)
+		},
 		destroy() {
 			destroyed = true
 			unsubscribe()

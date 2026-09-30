@@ -183,3 +183,132 @@ test('driftDelta against fewer current blobs never throws (stale slot after setO
 	assert.equal(deltas.length, base.length)
 	deltas.forEach(d => assert.ok(Number.isFinite(d.dx) && Number.isFinite(d.dy)))
 })
+
+// --- pulse modes ------------------------------------------------------------
+
+import { PULSE_MODES, isPulseMode } from '../src/lib/ambient-glow/index.ts'
+
+function fullFrame(overrides = {}) {
+	return {
+		level: 0,
+		swell: 0,
+		bands: new Array(8).fill(0),
+		onsets: new Array(8).fill(0),
+		beat: 0,
+		snare: 0,
+		orbit: 0,
+		centroid: 0,
+		time: 0,
+		...overrides,
+	}
+}
+const LOUD = fullFrame({
+	level: 0.8,
+	swell: 0.7,
+	bands: new Array(8).fill(0.9),
+	onsets: new Array(8).fill(1),
+	beat: 1,
+	snare: 1,
+	orbit: 2.4,
+	centroid: 0.8,
+	time: 4.2,
+})
+const isStill = t =>
+	t.layerScale === 1 &&
+	t.sideScale === 1 &&
+	t.filter === 'none' &&
+	t.majors.every(p => p.scale === 1 && Math.abs(p.dx) === 0 && Math.abs(p.dy) === 0 && p.opacity === 1)
+const withMode = (mode, extra = {}) => ({ ...OPTS, pulseMode: mode, ...extra })
+
+test('every mode is the identity on a silent frame and with amount 0', () => {
+	for (const mode of PULSE_MODES) {
+		assert.ok(isStill(pulseTransforms(blobs, fullFrame({ time: 7.7 }), withMode(mode))), `${mode} silent`)
+		assert.ok(isStill(pulseTransforms(blobs, LOUD, withMode(mode, { pulseAmount: 0 }))), `${mode} amount 0`)
+		assert.ok(!isStill(pulseTransforms(blobs, LOUD, withMode(mode))), `${mode} reacts to a loud frame`)
+	}
+})
+
+test('isPulseMode accepts only known modes', () => {
+	assert.ok(isPulseMode('boombap'))
+	assert.ok(!isPulseMode('Boombap'))
+	assert.ok(!isPulseMode(undefined))
+})
+
+test('kick mode ignores sustained bands and thumps on the beat', () => {
+	const sustained = pulseTransforms(blobs, fullFrame({ bands: new Array(8).fill(1) }), withMode('kick'))
+	assert.ok(isStill(sustained))
+	const kick = pulseTransforms(blobs, fullFrame({ beat: 1 }), withMode('kick'))
+	assert.ok(kick.layerScale > 1.15 && kick.majors[0].scale > kick.majors[1].scale)
+})
+
+test('transients mode reacts to hits, not sustained energy', () => {
+	const sustained = pulseTransforms(blobs, fullFrame({ bands: new Array(8).fill(1) }), withMode('transients'))
+	sustained.majors.forEach(p => assert.equal(p.scale, 1))
+	const onsets = new Array(8).fill(0)
+	onsets[7] = 1 // a hat
+	const hat = pulseTransforms(blobs, fullFrame({ onsets, level: 0.5 }), withMode('transients'))
+	assert.ok(hat.majors[majorCount - 1].scale > 1.4, 'the treble blob pops')
+	assert.equal(hat.majors[0].scale, 1, 'the bass blob does not')
+})
+
+test('boombap routes kick and snare to different gestures', () => {
+	const kick = pulseTransforms(blobs, fullFrame({ beat: 1 }), withMode('boombap'))
+	assert.ok(kick.layerScale > 1.1 && kick.majors[0].scale > 1.3)
+	assert.equal(kick.sideScale, 1)
+	assert.equal(kick.filter, 'none')
+	const snare = pulseTransforms(blobs, fullFrame({ snare: 1 }), withMode('boombap'))
+	assert.equal(snare.layerScale, 1)
+	assert.ok(snare.sideScale > 1.3)
+	assert.match(snare.filter, /^brightness\(1\.1/)
+	assert.ok(
+		snare.majors.some(p => Math.abs(p.dx) > 0.5),
+		'snare spreads the blobs',
+	)
+})
+
+test('orbit rotates blobs about the centre (distance preserved)', () => {
+	const t = pulseTransforms(blobs, fullFrame({ orbit: 1.3 }), withMode('orbit'))
+	majorsOf(blobs).forEach((blob, i) => {
+		const before = Math.hypot(blob.x - 50, blob.y - 50)
+		const after = Math.hypot(blob.x + t.majors[i].dx - 50, blob.y + t.majors[i].dy - 50)
+		assert.ok(Math.abs(before - after) < 1e-9)
+	})
+	assert.ok(t.majors.some(p => Math.abs(p.dx) > 1))
+})
+
+test('colour mode changes the filter, not the size', () => {
+	const t = pulseTransforms(blobs, LOUD, withMode('colour'))
+	assert.match(t.filter, /hue-rotate\(.*\) saturate\(.*\) brightness\(.*\)/)
+	t.majors.forEach(p => assert.equal(p.scale, 1))
+	assert.ok(t.layerScale < 1.05)
+})
+
+test('breathe follows the slow swell only', () => {
+	const fast = pulseTransforms(
+		blobs,
+		fullFrame({ level: 1, beat: 1, snare: 1, onsets: new Array(8).fill(1) }),
+		withMode('breathe'),
+	)
+	assert.ok(isStill(fast))
+	assert.ok(pulseTransforms(blobs, fullFrame({ swell: 0.8 }), withMode('breathe')).layerScale > 1.1)
+})
+
+test('knobs at 0 mute their feature', () => {
+	assert.equal(
+		pulseTransforms(blobs, fullFrame({ beat: 1 }), withMode('kick', { pulseKick: 0 })).layerScale,
+		1,
+	)
+	const noSnare = pulseTransforms(blobs, fullFrame({ snare: 1 }), withMode('boombap', { pulseSnare: 0 }))
+	assert.ok(isStill(noSnare))
+	const bassOnly = pulseTransforms(
+		blobs,
+		fullFrame({ bands: new Array(8).fill(1) }),
+		withMode('bands', { pulseTreble: 0 }),
+	)
+	assert.ok(bassOnly.majors[0].scale > 1.4)
+	assert.equal(bassOnly.majors[majorCount - 1].scale, 1)
+})
+
+function majorsOf(list) {
+	return list.filter(b => b.kind === 'major')
+}

@@ -245,6 +245,7 @@ const platforms = [
 			setPulseIntent,
 			type PulseDriver,
 		} from '../../lib/glow-pulse-driver'
+		import { parsePulseExperiment } from '../../lib/pulse-params'
 
 		const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
 		const LISTENER_COUNT_POLL_INTERVAL_MS = 15000
@@ -411,7 +412,15 @@ const platforms = [
 			// set would strip every subsequent page too.
 			document.documentElement.toggleAttribute('data-radio-stage', params.has('stage'))
 
+			// `?pulseMode=` and the knob params (`pulseBass`, `pulseTreble`,
+			// `pulseKick`, `pulseSnare`, `pulseShimmer`, `pulseSmooth`, plus the drum
+			// detectors' `pulseKickShape` / `pulseSnareStrict`) pick and tune the
+			// audio-reactive behaviour, for trying approaches in the browser.
+			const experiment = parsePulseExperiment(params)
+
 			const glow = mount(coverEl, {
+				...(experiment.mode ? { pulseMode: experiment.mode } : {}),
+				...experiment.knobs,
 				drift,
 				driftSpeed,
 				binSize: 64,
@@ -482,6 +491,8 @@ const platforms = [
 				observe: coverFrameEl,
 				getAmount: () => (pulseWanted() ? pulseAmount : 0),
 				onState: renderPulseUi,
+				smoothing: experiment.smooth,
+				detection: experiment.detection,
 			})
 			driver = pulseDriver
 			renderPulseUi()
