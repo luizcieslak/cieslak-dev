@@ -1,4 +1,6 @@
 export type RadioTrack = {
+	/** Server-side path, e.g. "./songs/Novel.mp3"; its last segment is the filename. */
+	path?: string
 	title?: string
 	artist?: string
 	album?: string
@@ -67,6 +69,17 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 	audio.volume = 0.45
 	audio.preload = 'none'
 
+	// Recording-only pinned mode (`?track=<filename>`, lofi-radio's promo-video
+	// workflow): show one specific track instead of whatever the station is
+	// playing, without touching the stream or the live metadata feed. The recorder
+	// and the scene editor's preview both open the page this way, so what is in
+	// frame no longer depends on the broadcast. `?theme=` then wins over the
+	// track's own theme, since a scene can ask for a different look than its track.
+	const params = new URLSearchParams(location.search)
+	const pinnedFilename = params.get('track')
+	const themeParam = params.get('theme')
+	const pinnedTheme: RadioTrack['theme'] = themeParam === 'light' || themeParam === 'dark' ? themeParam : undefined
+
 	// Per-page-lifetime id so duplicated tabs cannot inherit the same sessionStorage
 	// value and fight over one listener slot. Astro client-side navigation keeps
 	// this singleton alive, so the id still survives normal in-site navigation.
@@ -125,8 +138,31 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		startSSEHeartbeat()
 	}
 
+	const loadPinnedTrack = async (filename: string) => {
+		try {
+			const response = await fetch(internal.api + '/api/tracks', { cache: 'no-store' })
+			if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+			const data = await response.json()
+			const tracks: RadioTrack[] = Array.isArray(data?.tracks) ? data.tracks : []
+			const track = tracks.find(candidate => candidate.path?.split('/').pop() === filename)
+			if (!track) {
+				// Left blank on purpose: the recorder waits for the artwork, so a wrong
+				// filename fails the render with this in the console instead of filming
+				// some other track.
+				console.error(`[radio] pinned track not found: ${filename}`)
+				return
+			}
+
+			setTrack({ ...track, theme: pinnedTheme ?? track.theme })
+		} catch (err) {
+			console.error('[radio] could not load pinned track', err)
+		}
+	}
+
 	let lastMetadataResumeRefreshAt = 0
 	const refreshMetadataAfterResume = () => {
+		if (pinnedFilename) return
 		if (document.visibilityState !== 'visible') return
 
 		const now = Date.now()
@@ -257,6 +293,9 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 	}
 
 	const toggle = () => {
+		// Pinned mode is for filming a still page; the audio comes from the source
+		// file, so nothing here may open /stream.
+		if (pinnedFilename) return
 		if (!internal.state.wantPlaying) {
 			internal.state = { ...internal.state, wantPlaying: true, hasInteracted: true }
 			void requestWakeLock()
@@ -400,8 +439,12 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 
 	window.__radioPlayer = player
 
-	void refreshNowPlaying()
-	connectMetadataEvents()
+	if (pinnedFilename) {
+		void loadPinnedTrack(pinnedFilename)
+	} else {
+		void refreshNowPlaying()
+		connectMetadataEvents()
+	}
 
 	return player
 }
