@@ -91,6 +91,25 @@ const platforms = [
 						<em id='radio-album'></em>
 					</p>
 				</div>
+				<!-- Shown by the script only where the audio can be analysed (not Safari/iOS). -->
+				<div
+					id='radio-pulse'
+					data-label-connecting={t('glow.pulse.connecting')}
+					data-label-blocked={t('glow.pulse.blocked')}
+					data-label-unsupported={t('glow.pulse.unsupported')}
+					class='mt-4 hidden flex-col items-center gap-1'
+				>
+					<button
+						id='radio-pulse-toggle'
+						type='button'
+						aria-pressed='false'
+						title={t('radio.pulse.hint')}
+						class='rounded-full border border-main px-3 py-1 text-sm opacity-70 transition hover:opacity-100 disabled:opacity-40 aria-pressed:bg-muted aria-pressed:opacity-100'
+					>
+						{`✨ ${t('radio.pulse')}`}
+					</button>
+					<p id='radio-pulse-status' class='text-xs opacity-70' aria-live='polite'></p>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -163,7 +182,7 @@ const platforms = [
 		 * Hidden with `display: none` — `visibility: hidden` would leave the flex
 		 * layout reserving their space and the cover off-centre.
 		 */
-		:root[data-radio-stage] :is(nav, header, footer, #radio-playlist-links, #radio-miniplayer) {
+		:root[data-radio-stage] :is(nav, header, footer, #radio-playlist-links, #radio-miniplayer, #radio-pulse) {
 			display: none;
 		}
 
@@ -218,8 +237,15 @@ const platforms = [
 	</style>
 
 	<script>
-		import { getRadioPlayer } from '../../lib/radio-player'
+		import { getRadioPlayer, type AnalysisFailure } from '../../lib/radio-player'
 		import { mount } from '../../lib/ambient-glow'
+		import {
+			createPulseDriver,
+			getPulseIntent,
+			setPulseIntent,
+			type PulseDriver,
+		} from '../../lib/glow-pulse-driver'
+		import { parsePulseExperiment } from '../../lib/pulse-params'
 
 		const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
 		const LISTENER_COUNT_POLL_INTERVAL_MS = 15000
@@ -324,8 +350,10 @@ const platforms = [
 				listenerCountTimer = setInterval(updateListenerCount, LISTENER_COUNT_POLL_INTERVAL_MS)
 			}
 
-			playBtn.addEventListener('click', () => player.toggle(), { signal })
-			coverEl.addEventListener('dblclick', () => player.toggle(), { signal })
+			let handlePlayClick = () => player.toggle()
+			// Wired below, once the pulse driver exists (a `?pulse` play click also taps).
+			playBtn.addEventListener('click', () => handlePlayClick(), { signal })
+			coverEl.addEventListener('dblclick', () => handlePlayClick(), { signal })
 			coverEl.addEventListener('click', showControlsTemporarily, { signal })
 
 			const revealCover = () => {
@@ -369,8 +397,7 @@ const platforms = [
 			// present, so normal visitors get the static glow exactly as before.
 			// `?driftSpeed=` scales the pace independently: drift is how FAR blobs
 			// travel, driftSpeed is how FAST. Query params rather than constants so
-			// both can be tuned from the URL bar while a track is on the air,
-			// without an edit/HMR cycle.
+			// both can be tuned from the URL bar while a track is on the air.
 			const params = new URLSearchParams(location.search)
 			const positiveParam = (name: string, fallback: number) => {
 				const value = Number(params.get(name))
@@ -381,13 +408,19 @@ const platforms = [
 
 			// `?stage` strips the page to cover + metadata + glow for recording. The
 			// styling lives in CSS keyed off this attribute (see the <style> block).
-			// Set on <html> rather than the page root so it can also reach the nav and
-			// footer, which BaseLayout owns. Toggled per navigation rather than set
-			// once: Astro client-side nav keeps <html>, so leaving it set would strip
-			// every subsequent page too.
+			// Toggled per navigation: Astro client-side nav keeps <html>, so leaving it
+			// set would strip every subsequent page too.
 			document.documentElement.toggleAttribute('data-radio-stage', params.has('stage'))
 
+			// `?pulseMode=` and the knob params (`pulseBass`, `pulseTreble`,
+			// `pulseKick`, `pulseSnare`, `pulseShimmer`, `pulseSmooth`, plus the drum
+			// detectors' `pulseKickShape` / `pulseSnareStrict`) pick and tune the
+			// audio-reactive behaviour, for trying approaches in the browser.
+			const experiment = parsePulseExperiment(params)
+
 			const glow = mount(coverEl, {
+				...(experiment.mode ? { pulseMode: experiment.mode } : {}),
+				...experiment.knobs,
 				drift,
 				driftSpeed,
 				binSize: 64,
@@ -409,9 +442,107 @@ const platforms = [
 
 			if (drift > 0) glow.setDrift(true)
 
+			// Audio-reactive glow. Tapping the audio stays an explicit click (see
+			// RadioPlayer.enableAnalysis); once this session is tapped — here or in the
+			// blog sandbox — the glow pulses by default unless the listener turned it
+			// off (session-scoped intent) or prefers reduced motion.
+			const pulseWrap = document.getElementById('radio-pulse')!
+			const pulseBtn = document.getElementById('radio-pulse-toggle') as HTMLButtonElement
+			const pulseStatus = document.getElementById('radio-pulse-status')!
+			const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+			// `?pulse=<0–3>` sets the pulse strength from the URL (bare `?pulse` = 1),
+			// e.g. for recordings. It is an explicit choice, so it writes the session
+			// intent (and so wins over reduced motion); `?pulse=0` forces it off.
+			const pulseParam = params.get('pulse')
+			const pulseAmountParam = (() => {
+				if (pulseParam === null) return null
+				if (pulseParam === '') return 1
+				const value = Number(pulseParam)
+				return Number.isFinite(value) ? Math.min(3, Math.max(0, value)) : null
+			})()
+			if (pulseAmountParam !== null) setPulseIntent(pulseAmountParam > 0 ? 'on' : 'off')
+			const pulseAmount = pulseAmountParam && pulseAmountParam > 0 ? pulseAmountParam : 1
+			const pulseWanted = () => {
+				const intent = getPulseIntent()
+				return intent ? intent === 'on' : !reducedMotion
+			}
+			let pulseConnecting = false
+			let pulseFailure: AnalysisFailure | null = null
+			// Assigned below; the driver's player.subscribe() calls back synchronously.
+			let driver: PulseDriver | null = null
+
+			const renderPulseUi = () => {
+				const tapped = driver?.hasAnalyser() ?? false
+				const available = tapped || player.canAnalyse()
+				pulseWrap.classList.toggle('hidden', !available)
+				pulseWrap.classList.toggle('flex', available)
+				pulseBtn.setAttribute('aria-pressed', String(tapped && pulseWanted()))
+				pulseBtn.disabled = pulseConnecting || pulseFailure === 'failed' || pulseFailure === 'unsupported'
+				const labels = pulseWrap.dataset
+				if (pulseConnecting) pulseStatus.textContent = labels.labelConnecting ?? ''
+				else if (pulseFailure === 'blocked') pulseStatus.textContent = labels.labelBlocked ?? ''
+				else if (pulseFailure) pulseStatus.textContent = labels.labelUnsupported ?? ''
+				else pulseStatus.textContent = ''
+			}
+
+			const pulseDriver = createPulseDriver({
+				glow,
+				player,
+				observe: coverFrameEl,
+				getAmount: () => (pulseWanted() ? pulseAmount : 0),
+				onState: renderPulseUi,
+				smoothing: experiment.smooth,
+				detection: experiment.detection,
+			})
+			driver = pulseDriver
+			renderPulseUi()
+
+			const startTap = () => {
+				setPulseIntent('on')
+				pulseConnecting = true
+				pulseFailure = null
+				const pending = pulseDriver.requestTap()
+				renderPulseUi()
+				void pending.then(result => {
+					pulseConnecting = false
+					if (signal.aborted) return
+					if (!result.ok) pulseFailure = result.reason
+					renderPulseUi()
+				})
+			}
+
+			// With `?pulse` on, starting the radio from the page's own play button is
+			// the opt-in click, so it taps inside that same gesture (requestTap also
+			// starts playback). Otherwise play/pause is exactly as before.
+			handlePlayClick = () => {
+				const wantsTap =
+					pulseAmountParam !== null &&
+					pulseAmountParam > 0 &&
+					!player.getState().wantPlaying &&
+					!pulseDriver.hasAnalyser() &&
+					player.canAnalyse()
+				if (wantsTap) startTap()
+				else player.toggle()
+			}
+
+			pulseBtn.addEventListener(
+				'click',
+				() => {
+					if (pulseDriver.hasAnalyser()) {
+						setPulseIntent(pulseWanted() ? 'off' : 'on')
+						pulseDriver.refresh()
+						renderPulseUi()
+						return
+					}
+					startTap()
+				},
+				{ signal },
+			)
+
 			document.addEventListener(
 				'astro:before-preparation',
 				() => {
+					pulseDriver.destroy()
 					if (controlsVisibleTimer) clearTimeout(controlsVisibleTimer)
 					if (listenerCountTimer) clearInterval(listenerCountTimer)
 					unsubscribe()

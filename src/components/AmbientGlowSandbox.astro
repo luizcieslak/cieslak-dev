@@ -37,6 +37,16 @@ try {
 <figure
 	class='ambient-glow-sandbox not-prose my-10 rounded-lg border border-main bg-muted/30 p-4'
 	data-demo-images={JSON.stringify(demoImages)}
+	data-label-enable={t('glow.pulse.enable')}
+	data-label-play={t('glow.pulse.play')}
+	data-label-pause={t('glow.pulse.pause')}
+	data-label-connecting={t('glow.pulse.connecting')}
+	data-label-pulsing-to={t('glow.pulse.pulsingTo')}
+	data-label-paused={t('glow.pulse.paused')}
+	data-label-blocked={t('glow.pulse.blocked')}
+	data-label-unsupported={t('glow.pulse.unsupported')}
+	data-label-off={t('glow.pulse.off')}
+	data-label-amount={t('glow.pulse.amount')}
 >
 	<div
 		class='ambient-glow-sandbox-stage relative mx-auto flex aspect-square w-full max-w-md items-center justify-center overflow-visible'
@@ -47,6 +57,25 @@ try {
 			alt={defaultAlt}
 			crossorigin='anonymous'
 		/>
+	</div>
+
+	<div class='ambient-glow-sandbox-pulse mt-5 grid gap-2 rounded-md border border-main p-3 text-sm'>
+		<p class='font-medium'>{t('glow.pulse.title')}</p>
+		<p class='text-xs opacity-70'>{t('glow.pulse.hint')}</p>
+		<div class='flex flex-wrap items-center gap-x-3 gap-y-2'>
+			<button
+				type='button'
+				class='ambient-glow-sandbox-pulse-toggle rounded-md border border-main px-3 py-1.5 font-medium opacity-90 transition-opacity hover:opacity-100 disabled:opacity-50'
+			>
+				{t('glow.pulse.enable')}
+			</button>
+			<span class='ambient-glow-sandbox-pulse-status min-w-0 flex-1 text-xs opacity-70' aria-live='polite'
+			></span>
+		</div>
+		<canvas class='ambient-glow-sandbox-spectrum hidden h-12 w-full' aria-hidden='true'></canvas>
+		<div class='ambient-glow-sandbox-pulse-controls grid gap-x-2'>
+			<!-- pulse amount slider; see <script> below -->
+		</div>
 	</div>
 
 	<div class='mt-5 grid gap-3 text-sm'>
@@ -81,7 +110,28 @@ try {
 </figure>
 
 <script>
-	import { mount, type GlowOptions } from '../lib/ambient-glow'
+	import { bandForRank, mount, type GlowHandle, type GlowOptions } from '../lib/ambient-glow'
+	import type { PulseFrame } from '../lib/audio-pulse'
+	import { createPulseDriver, type PulseDriver } from '../lib/glow-pulse-driver'
+	import { PULSE_MODES, isPulseMode, type PulseMode } from '../lib/ambient-glow'
+	import { DEFAULT_DRUM_DETECTION, type DrumDetection } from '../lib/audio-pulse'
+	import {
+		PULSE_DETECTION_PARAMS,
+		PULSE_KNOBS,
+		PULSE_SMOOTH_RANGE,
+		hasPulseExperiment,
+		parsePulseExperiment,
+		pulseExperimentQuery,
+		type PulseKnob,
+	} from '../lib/pulse-params'
+	import {
+		getRadioPlayer,
+		type AnalysisFailure,
+		type RadioPlayer,
+		type RadioState,
+	} from '../lib/radio-player'
+
+	const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
 
 	type ControlKey = keyof GlowOptions
 
@@ -130,6 +180,15 @@ try {
 		{ key: 'skipWhite', label: 'Skip near-white pixels', default: true },
 	]
 
+	const PULSE_AMOUNT: SliderSpec = {
+		key: 'pulseAmount',
+		label: 'Pulse amount',
+		min: 0,
+		max: 2,
+		step: 0.05,
+		default: 1,
+	}
+
 	const SPEC_BY_KEY = new Map<ControlKey, SliderSpec>(
 		[...CURATED, ...ADVANCED_SLIDERS].map(spec => [spec.key, spec]),
 	)
@@ -163,6 +222,340 @@ try {
 		return row
 	}
 
+	/**
+	 * Wires one sandbox to the radio: the explicit pulse button (the only thing
+	 * allowed to tap the audio, see RadioPlayer.enableAnalysis), the rAF loop
+	 * feeding glow.setPulse(), and the mini spectrum. Returns a cleanup.
+	 */
+	interface PulseBinding {
+		/** Call when the pulse amount changes: 0 stops all motion, >0 restarts it. */
+		refresh: () => void
+		/** Change the analyzer's release/decay scale (experiment panel). */
+		setSmoothing: (scale: number) => void
+		/** Change drum-detector thresholds (experiment panel). */
+		setDetection: (detection: Partial<DrumDetection>) => void
+		cleanup: () => void
+	}
+
+	function bindPulse(
+		root: HTMLElement,
+		glow: GlowHandle,
+		player: RadioPlayer,
+		getAmount: () => number,
+		signal: AbortSignal,
+		smoothing?: number,
+		detection?: Partial<DrumDetection>,
+	): PulseBinding {
+		const labels = root.dataset
+		const toggle = root.querySelector<HTMLButtonElement>('.ambient-glow-sandbox-pulse-toggle')!
+		const status = root.querySelector<HTMLElement>('.ambient-glow-sandbox-pulse-status')!
+		const canvas = root.querySelector<HTMLCanvasElement>('.ambient-glow-sandbox-spectrum')!
+		const canvasCtx = canvas.getContext('2d')
+
+		let state: RadioState = player.getState()
+		let connecting = false
+		// Known up front on Safari/iOS: never offer a click that can't work (and
+		// would only start the radio).
+		let failure: AnalysisFailure | null = player.getAnalyser() || player.canAnalyse() ? null : 'unsupported'
+		// Per band: the colour of the blob it drives, or null if no blob follows it.
+		let barColors: Array<string | null> = []
+		let textColor = ''
+		let framesSinceColors = Infinity
+
+		// Assigned below; player.subscribe() inside createPulseDriver calls onState
+		// synchronously, before the assignment, so render() must tolerate its absence.
+		let driver: PulseDriver | null = null
+		const tapped = () => driver?.hasAnalyser() ?? false
+
+		const render = () => {
+			// Only "blocked" is worth retrying; unsupported/failed won't change on a new click.
+			toggle.disabled = connecting || failure === 'unsupported' || failure === 'failed'
+			if (!tapped()) {
+				toggle.textContent = labels.labelEnable ?? ''
+				if (connecting) status.textContent = labels.labelConnecting ?? ''
+				else if (failure === 'blocked') status.textContent = labels.labelBlocked ?? ''
+				else if (failure) status.textContent = labels.labelUnsupported ?? ''
+				else status.textContent = ''
+				canvas.classList.add('hidden')
+				return
+			}
+			canvas.classList.toggle('hidden', getAmount() === 0)
+			toggle.textContent = (state.wantPlaying ? labels.labelPause : labels.labelPlay) ?? ''
+			if (state.playing && getAmount() === 0) {
+				status.textContent = labels.labelOff ?? ''
+			} else if (state.playing && state.track) {
+				const who = [state.track.title, state.track.artist].filter(Boolean).join(' — ')
+				status.textContent = `${labels.labelPulsingTo ?? ''} ${who}`
+			} else if (state.wantPlaying) {
+				status.textContent = labels.labelConnecting ?? ''
+			} else {
+				status.textContent = labels.labelPaused ?? ''
+			}
+		}
+
+		const refreshColors = (bandCount: number) => {
+			const majors = glow.getBlobs().filter(blob => blob.kind === 'major')
+			barColors = new Array<string | null>(bandCount).fill(null)
+			majors.forEach(({ rank, color }) => {
+				barColors[bandForRank(rank, majors.length, bandCount)] = `rgb(${color.r},${color.g},${color.b})`
+			})
+			textColor = getComputedStyle(canvas).color
+		}
+
+		const drawSpectrum = (frame: PulseFrame) => {
+			if (!canvasCtx) return
+			const dpr = window.devicePixelRatio || 1
+			const w = Math.round(canvas.clientWidth * dpr)
+			const h = Math.round(canvas.clientHeight * dpr)
+			if (!w || !h) return
+			if (canvas.width !== w || canvas.height !== h) {
+				canvas.width = w
+				canvas.height = h
+			}
+			// Colours only change with the image/options/theme; refresh twice a second.
+			if (framesSinceColors++ > 30) {
+				framesSinceColors = 0
+				refreshColors(frame.bands.length)
+			}
+			canvasCtx.clearRect(0, 0, w, h)
+			const gap = 4 * dpr
+			const barW = (w - gap * (frame.bands.length - 1)) / frame.bands.length
+			frame.bands.forEach((value, i) => {
+				const barH = Math.max(2 * dpr, value * h)
+				const color = barColors[i]
+				// Bands no blob listens to are drawn neutral and faint.
+				canvasCtx.fillStyle = color ?? textColor
+				canvasCtx.globalAlpha = color ? 0.35 + 0.65 * value : 0.15 + 0.25 * value
+				canvasCtx.fillRect(i * (barW + gap), h - barH, barW, barH)
+			})
+			// Loudness as a thin line across, beats as a flash of it.
+			canvasCtx.globalAlpha = 0.4 + 0.6 * frame.beat
+			canvasCtx.fillStyle = textColor
+			canvasCtx.fillRect(0, h - frame.level * h, w, Math.max(1, dpr * (1 + 2 * frame.beat)))
+			canvasCtx.globalAlpha = 1
+		}
+
+		const pulseDriver = createPulseDriver({
+			glow,
+			player,
+			observe: root,
+			getAmount,
+			onFrame: drawSpectrum,
+			smoothing,
+			detection,
+			onState: next => {
+				state = next
+				render()
+			},
+		})
+
+		toggle.addEventListener(
+			'click',
+			() => {
+				if (tapped()) {
+					player.toggle()
+					return
+				}
+				if (failure === 'unsupported' || failure === 'failed') return
+				connecting = true
+				failure = null
+				const pending = pulseDriver.requestTap()
+				render()
+				void pending.then(result => {
+					connecting = false
+					if (signal.aborted) return
+					if (!result.ok) failure = result.reason
+					render()
+				})
+			},
+			{ signal },
+		)
+
+		driver = pulseDriver
+		render()
+
+		return {
+			refresh: () => {
+				render()
+				pulseDriver.refresh()
+			},
+			setSmoothing: scale => pulseDriver.setSmoothing(scale),
+			setDetection: next => pulseDriver.setDetection(next),
+			cleanup: () => pulseDriver.destroy(),
+		}
+	}
+
+	interface ExperimentPanelOptions {
+		mode: PulseMode
+		knobs: Partial<Record<PulseKnob, number>>
+		smooth: number
+		detection: Partial<DrumDetection>
+		getAmount: () => number
+		onMode: (mode: PulseMode) => void
+		onKnob: (key: PulseKnob, value: number) => void
+		onSmooth: (value: number) => void
+		onDetection: (detection: Partial<DrumDetection>) => void
+		/** Whether the sandbox image follows the radio's current album cover. */
+		followCover: boolean
+		onFollowCover: (follow: boolean) => void
+		signal: AbortSignal
+	}
+
+	interface ExperimentPanel {
+		/** Reflect a follow-cover change made elsewhere (upload / randomize). */
+		setFollowCover: (follow: boolean) => void
+	}
+
+	/**
+	 * Dev-only controls for comparing pulse modes: shown only when the URL carries
+	 * an experiment param (e.g. `?pulseMode=boombap`), so blog readers never see it.
+	 * Every change is mirrored into the URL (replaceState), and there's a link that
+	 * opens /radio with the same settings.
+	 */
+	function buildExperimentPanel(root: HTMLElement, options: ExperimentPanelOptions): ExperimentPanel | null {
+		const host = root.querySelector<HTMLElement>('.ambient-glow-sandbox-pulse')
+		if (!host) return null
+		const state = {
+			mode: options.mode,
+			knobs: { ...options.knobs },
+			smooth: options.smooth,
+			detection: { ...options.detection },
+		}
+		const lang = location.pathname.split('/')[1] === 'pt-br' ? 'pt-br' : 'en'
+
+		const panel = document.createElement('fieldset')
+		panel.className = 'mt-2 grid gap-2 rounded-md border border-dashed border-main p-3 text-xs'
+		panel.innerHTML = `<legend class="px-1 font-medium">Pulse experiment</legend>`
+
+		const modeRow = document.createElement('label')
+		modeRow.className = 'flex items-center gap-3'
+		modeRow.innerHTML = `<span class="w-20 shrink-0 opacity-80">Mode</span>`
+		const select = document.createElement('select')
+		select.className = 'rounded border border-main bg-main px-2 py-1'
+		for (const mode of PULSE_MODES) select.add(new Option(mode, mode, false, mode === state.mode))
+		modeRow.append(select)
+		panel.append(modeRow)
+
+		// Tune against the song's own cover, like /radio shows it.
+		const coverRow = document.createElement('label')
+		coverRow.className = 'flex items-center gap-3'
+		coverRow.innerHTML = `<span class="w-20 shrink-0 opacity-80">Cover</span>`
+		const followCover = document.createElement('input')
+		followCover.type = 'checkbox'
+		followCover.checked = options.followCover
+		const coverLabel = document.createElement('span')
+		coverLabel.className = 'opacity-80'
+		coverLabel.textContent = 'Use current album cover'
+		coverRow.append(followCover, coverLabel)
+		panel.append(coverRow)
+		followCover.addEventListener('change', () => options.onFollowCover(followCover.checked), {
+			signal: options.signal,
+		})
+
+		const link = document.createElement('a')
+		link.className = 'justify-self-start underline opacity-80 hover:opacity-100'
+		link.textContent = 'Open on /radio with these settings'
+
+		const sync = () => {
+			const query = pulseExperimentQuery(
+				options.getAmount(),
+				state.mode,
+				state.knobs,
+				state.smooth,
+				state.detection,
+			)
+			link.href = `/${lang}/radio/?${query}`
+			const params = new URLSearchParams(location.search)
+			for (const [key, value] of new URLSearchParams(query)) {
+				if (key !== 'pulse') params.set(key, value)
+			}
+			for (const { key } of PULSE_KNOBS)
+				if (state.knobs[key] === undefined || state.knobs[key] === 1) params.delete(key)
+			if (state.smooth === 1) params.delete('pulseSmooth')
+			for (const { param, key } of PULSE_DETECTION_PARAMS) {
+				const value = state.detection[key]
+				if (value === undefined || value === DEFAULT_DRUM_DETECTION[key]) params.delete(param)
+			}
+			history.replaceState(history.state, '', `${location.pathname}?${params}${location.hash}`)
+		}
+
+		select.addEventListener(
+			'change',
+			() => {
+				const mode = select.value
+				if (!isPulseMode(mode)) return
+				state.mode = mode
+				options.onMode(state.mode)
+				sync()
+			},
+			{ signal: options.signal },
+		)
+
+		const slider = (
+			label: string,
+			min: number,
+			max: number,
+			value: number,
+			onInput: (value: number) => void,
+		) => {
+			const row = document.createElement('label')
+			row.className = 'grid grid-cols-[5rem_1fr_2.5rem] items-center gap-3'
+			row.innerHTML = `<span class="opacity-80">${label}</span>`
+			const input = document.createElement('input')
+			Object.assign(input, {
+				type: 'range',
+				min: String(min),
+				max: String(max),
+				step: '0.05',
+				value: String(value),
+			})
+			input.className = 'demo-slider min-w-0'
+			const output = document.createElement('output')
+			output.className = 'text-right tabular-nums opacity-70'
+			output.textContent = value.toFixed(2)
+			input.addEventListener(
+				'input',
+				() => {
+					const next = Number(input.value)
+					output.textContent = next.toFixed(2)
+					input.style.setProperty('--demo-slider-pct', `${((next - min) / (max - min)) * 100}%`)
+					onInput(next)
+					sync()
+				},
+				{ signal: options.signal },
+			)
+			input.style.setProperty('--demo-slider-pct', `${((value - min) / (max - min)) * 100}%`)
+			row.append(input, output)
+			panel.append(row)
+		}
+
+		for (const { key, label, max } of PULSE_KNOBS) {
+			slider(label, 0, max, state.knobs[key] ?? 1, value => {
+				state.knobs[key] = value
+				options.onKnob(key, value)
+			})
+		}
+		slider('Smooth', PULSE_SMOOTH_RANGE.min, PULSE_SMOOTH_RANGE.max, state.smooth, value => {
+			state.smooth = value
+			options.onSmooth(value)
+		})
+		for (const { key, label, min, max } of PULSE_DETECTION_PARAMS) {
+			slider(label, min, max, state.detection[key] ?? DEFAULT_DRUM_DETECTION[key], value => {
+				state.detection[key] = value
+				options.onDetection({ ...state.detection })
+			})
+		}
+
+		panel.append(link)
+		host.append(panel)
+		sync()
+		return {
+			setFollowCover: follow => {
+				followCover.checked = follow
+			},
+		}
+	}
+
 	document.addEventListener('astro:page-load', () => {
 		const roots = document.querySelectorAll<HTMLElement>('.ambient-glow-sandbox')
 		if (roots.length === 0) return
@@ -178,12 +571,34 @@ try {
 			const randomize = root.querySelector<HTMLButtonElement>('.ambient-glow-sandbox-randomize')!
 			// Covers discovered at build time from public/lofi-radio/glow-demo/ (see frontmatter).
 			const demoImages = JSON.parse(root.dataset.demoImages || '[]') as string[]
+			const pulseHost = root.querySelector<HTMLElement>('.ambient-glow-sandbox-pulse-controls')!
+			const audio = document.getElementById('radio-audio') as HTMLAudioElement | null
+
+			// Motion-sensitive readers start with a static glow; the slider can opt in.
+			const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+			const pulseSpec: SliderSpec = {
+				...PULSE_AMOUNT,
+				label: root.dataset.labelAmount || PULSE_AMOUNT.label,
+				default: reducedMotion ? 0 : PULSE_AMOUNT.default,
+			}
+			let pulseAmount = pulseSpec.default
+			let pulseBinding: PulseBinding | null = null
 
 			CURATED.forEach(spec => curatedHost.appendChild(buildSliderRow(spec)))
+			if (audio) pulseHost.appendChild(buildSliderRow(pulseSpec))
+			else root.querySelector('.ambient-glow-sandbox-pulse')?.remove()
 			ADVANCED_SLIDERS.forEach(spec => advancedHost.appendChild(buildSliderRow(spec)))
 			ADVANCED_BOOLS.forEach(spec => advancedHost.appendChild(buildBoolRow(spec)))
 
-			const glow = mount(img)
+			// Pulse experiments (`?pulseMode=` + knob params): same params as /radio,
+			// plus live controls below when any of them is in the URL.
+			const urlParams = new URLSearchParams(location.search)
+			const experiment = parsePulseExperiment(urlParams)
+			const glow = mount(img, {
+				pulseAmount,
+				...(experiment.mode ? { pulseMode: experiment.mode } : {}),
+				...experiment.knobs,
+			})
 
 			const controller = new AbortController()
 			const { signal } = controller
@@ -222,7 +637,11 @@ try {
 						if (output) pendingDisplays.set(output, Number.isInteger(value) ? `${value}` : value.toFixed(2))
 						const patch = pendingPatch as Record<string, number | boolean>
 						patch[key] = value
-						if (key === 'fadeMs') {
+						if (key === 'pulseAmount') {
+							// Scales per-frame motion only; no fade override, no rebuild.
+							pulseAmount = value
+							pulseBinding?.refresh()
+						} else if (key === 'fadeMs') {
 							userFadeMs = value
 						} else {
 							patch.fadeMs = FADE_OVERRIDE_MS
@@ -234,7 +653,7 @@ try {
 				input.addEventListener(
 					'change',
 					() => {
-						if (key === 'fadeMs') return
+						if (key === 'fadeMs' || key === 'pulseAmount') return
 						;(pendingPatch as Record<string, number | boolean>).fadeMs = userFadeMs
 						schedule()
 					},
@@ -265,11 +684,20 @@ try {
 			)
 
 			let lastObjectUrl: string | null = null
+			// Experiment mode: follow the radio's current album cover (see below).
+			// Picking an image yourself (upload / randomize) turns that off.
+			let followCover = false
+			let experimentPanel: ExperimentPanel | null = null
+			const stopFollowingCover = () => {
+				followCover = false
+				experimentPanel?.setFollowCover(false)
+			}
 			upload.addEventListener(
 				'change',
 				() => {
 					const file = upload.files?.[0]
 					if (!file) return
+					stopFollowingCover()
 					if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl)
 					lastObjectUrl = URL.createObjectURL(file)
 					img.removeAttribute('crossorigin')
@@ -292,6 +720,7 @@ try {
 						input.dispatchEvent(new Event('change', { bubbles: true }))
 					})
 
+					stopFollowingCover()
 					// Switch to a different demo cover (skip the one already showing).
 					const choices = demoImages.filter(src => !img.src.endsWith(src))
 					const pool = choices.length ? choices : demoImages
@@ -308,7 +737,55 @@ try {
 				{ signal },
 			)
 
+			const player = audio ? getRadioPlayer(audio, RADIO_API) : null
+			pulseBinding =
+				audio && player
+					? bindPulse(root, glow, player, () => pulseAmount, signal, experiment.smooth, experiment.detection)
+					: null
+
+			const showCurrentCover = () => {
+				const track = player?.getState().track
+				const cover = track?.albumArtUrl || track?.coverUrl
+				// Tracks without art keep whatever image is showing.
+				if (!cover || img.src === cover) return
+				if (lastObjectUrl) {
+					URL.revokeObjectURL(lastObjectUrl)
+					lastObjectUrl = null
+				}
+				img.setAttribute('crossorigin', 'anonymous')
+				img.src = cover
+				img.alt = track?.title ? `${track.title} cover` : ''
+			}
+			let unsubscribeCover: (() => void) | null = null
+
+			if (pulseBinding && player && hasPulseExperiment(urlParams)) {
+				const binding = pulseBinding
+				followCover = true
+				unsubscribeCover = player.subscribe(() => {
+					if (followCover) showCurrentCover()
+				})
+				experimentPanel = buildExperimentPanel(root, {
+					mode: experiment.mode ?? 'bands',
+					knobs: experiment.knobs,
+					smooth: experiment.smooth ?? 1,
+					detection: experiment.detection,
+					getAmount: () => pulseAmount,
+					onMode: mode => glow.setOptions({ pulseMode: mode }),
+					onKnob: (key, value) => glow.setOptions({ [key]: value }),
+					onSmooth: value => binding.setSmoothing(value),
+					onDetection: next => binding.setDetection(next),
+					followCover,
+					onFollowCover: follow => {
+						followCover = follow
+						if (follow) showCurrentCover()
+					},
+					signal,
+				})
+			}
+
 			cleanups.push(() => {
+				unsubscribeCover?.()
+				pulseBinding?.cleanup()
 				controller.abort()
 				if (pendingFrame !== null) cancelAnimationFrame(pendingFrame)
 				glow.destroy()

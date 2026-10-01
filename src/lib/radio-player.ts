@@ -1,3 +1,5 @@
+import { chooseTapMode, guardTap, resumeWithTimeout, type TapMode } from './audio-tap-guard'
+
 export type RadioTrack = {
 	/** Server-side path, e.g. "./songs/Novel.mp3"; its last segment is the filename. */
 	path?: string
@@ -24,7 +26,49 @@ export type RadioPlayer = {
 	toggle: () => void
 	getState: () => RadioState
 	subscribe: (listener: (state: RadioState) => void) => () => void
+	/**
+	 * Opt-in audio analysis for visualizers. Call it synchronously from a user
+	 * gesture. Once it succeeds, the tap lasts for the page session (see AudioTap).
+	 */
+	enableAnalysis: () => Promise<AnalysisResult>
+	/** The analyser if enableAnalysis() already succeeded, else null. */
+	getAnalyser: () => AnalyserNode | null
+	/**
+	 * Whether enableAnalysis() could ever succeed in this browser. Known
+	 * synchronously, so UIs can hide the feature instead of offering a dead end.
+	 */
+	canAnalyse: () => boolean
 }
+
+export type AnalysisFailure = Extract<AnalysisResult, { ok: false }>['reason']
+
+export type AnalysisResult =
+	| { ok: true; analyser: AnalyserNode }
+	/**
+	 * unsupported: no Web Audio, or no tap that can't mute the radio (WebKit). blocked: the context wouldn't start (no user
+	 * activation) — retrying from a click can work. failed: tapping the element threw.
+	 */
+	| { ok: false; reason: 'unsupported' | 'blocked' | 'failed' }
+
+/**
+ * How the analyser is fed from the persisted <audio>:
+ * - `capture` (Chromium): element.captureStream() feeds the analyser while the
+ *   element keeps playing through its own output path, so a suspended context
+ *   can only freeze the visual and never silence the radio.
+ * - `routed` (Firefox only, see chooseTapMode): createMediaElementSource()
+ *   reroutes the element's output through the context. It's permanent for the
+ *   element, so this player must keep the context running whenever the radio
+ *   should be audible.
+ * Safari/iOS get no tap at all: WebKit's media-element source is silent for
+ * chunked live streams, so routing would mute the radio.
+ */
+type AudioTap = {
+	mode: TapMode
+	ctx: AudioContext
+	analyser: AnalyserNode
+}
+
+type CapturableAudio = HTMLAudioElement & { captureStream: () => MediaStream }
 
 type Internal = {
 	api: string
@@ -37,12 +81,17 @@ type Internal = {
 	events: EventSource | null
 	heartbeatTimer: ReturnType<typeof setInterval> | null
 	sseHeartbeatTimer: ReturnType<typeof setInterval> | null
+	tap: AudioTap | null
+	tapPending: Promise<AnalysisResult> | null
 }
 
 const BASE_BACKOFF_MS = 1000
 const MAX_BACKOFF_MS = 30000
 const HEARTBEAT_INTERVAL_MS = 150_000
 const METADATA_RESUME_REFRESH_MIN_INTERVAL_MS = 5_000
+// ctx.resume() can hang (not reject) when the browser withholds activation.
+const AUDIO_RESUME_TIMEOUT_MS = 1000
+const ANALYSER_FFT_SIZE = 2048
 
 declare global {
 	interface Window {
@@ -64,6 +113,8 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		events: null,
 		heartbeatTimer: null,
 		sseHeartbeatTimer: null,
+		tap: null,
+		tapPending: null,
 	}
 
 	audio.volume = 0.45
@@ -255,6 +306,9 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 			internal.reconnectTimer = null
 		}
 		console.warn(`[radio] connect() attempt=${internal.reconnectAttempt}`)
+		// Every way playback (re)starts funnels through here, so this is where a
+		// routed tap's context is brought back up.
+		ensureTapRunning()
 		audio.src = internal.api + '/stream?sid=' + sessionId + '&hb=1&t=' + Date.now()
 		audio.play().catch(err => {
 			console.warn('[radio] play() rejected', err && err.name, err && err.message)
@@ -286,10 +340,123 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		audio.pause()
 		audio.removeAttribute('src')
 		audio.load()
+		// Free the audio device while the radio is off; connect() resumes it.
+		void internal.tap?.ctx.suspend().catch(() => {})
 		if ('mediaSession' in navigator) {
 			navigator.mediaSession.playbackState = 'paused'
 		}
 		emit()
+	}
+
+	// Invariant for a routed tap: wantPlaying ⇒ context running. If the context
+	// can't come back while the page is visible, stop instead of "playing" in
+	// silence (the watchdog can't see that — currentTime keeps advancing). The
+	// next play click is a user gesture, which lets resume() succeed.
+	const ensureTapRunning = () => {
+		const tap = internal.tap
+		if (!tap) return
+		void guardTap({
+			mode: tap.mode,
+			isRunning: () => tap.ctx.state === 'running',
+			wantPlaying: () => internal.state.wantPlaying,
+			isVisible: () => document.visibilityState === 'visible',
+			resume: () => resumeWithTimeout(tap.ctx, AUDIO_RESUME_TIMEOUT_MS),
+			stop,
+		}).then(outcome => {
+			if (outcome === 'stopped') console.warn(`[radio] audio context stuck in "${tap.ctx.state}", stopped`)
+		})
+	}
+
+	const tapMode = (): TapMode | null => {
+		if (typeof window.AudioContext !== 'function') return null
+		return chooseTapMode({
+			captureStream: canCapture(audio),
+			mozCaptureStream: 'mozCaptureStream' in audio,
+		})
+	}
+
+	const canCapture = (el: HTMLAudioElement): el is CapturableAudio =>
+		'captureStream' in el && typeof el.captureStream === 'function'
+
+	const attachCapture = (el: CapturableAudio, ctx: AudioContext, analyser: AnalyserNode) => {
+		// Keep the graph pulled without making a second audible copy.
+		const sink = ctx.createGain()
+		sink.gain.value = 0
+		analyser.connect(sink).connect(ctx.destination)
+
+		const stream = el.captureStream()
+		let source: MediaStreamAudioSourceNode | null = null
+		// connect() swaps audio.src on every reconnect, which replaces the captured
+		// track, so rebind the source whenever the track set changes.
+		const rebind = () => {
+			source?.disconnect()
+			source = null
+			const track = stream.getAudioTracks().find(t => t.readyState === 'live')
+			if (!track) return
+			source = ctx.createMediaStreamSource(new MediaStream([track]))
+			source.connect(analyser)
+		}
+		stream.addEventListener('addtrack', rebind)
+		stream.addEventListener('removetrack', rebind)
+		rebind()
+	}
+
+	const enableAnalysis = (): Promise<AnalysisResult> => {
+		if (internal.tap) {
+			ensureTapRunning()
+			return Promise.resolve({ ok: true, analyser: internal.tap.analyser })
+		}
+		if (internal.tapPending) return internal.tapPending
+
+		const mode = tapMode()
+		if (!mode) return Promise.resolve({ ok: false, reason: 'unsupported' })
+
+		// Analysis needs CORS-clean samples. Only opted-in listeners switch the
+		// stream request to CORS mode (lofi-radio sends ACAO: *); reopen now if a
+		// non-CORS stream is already loaded.
+		if (audio.crossOrigin !== 'anonymous') {
+			audio.crossOrigin = 'anonymous'
+			if (internal.state.wantPlaying) connect()
+		}
+
+		// Created and resumed synchronously inside the caller's gesture.
+		const ctx = new AudioContext()
+		internal.tapPending = resumeWithTimeout(ctx, AUDIO_RESUME_TIMEOUT_MS).then((running): AnalysisResult => {
+			internal.tapPending = null
+			if (!running) {
+				// Never route the element into a context that isn't running.
+				void ctx.close().catch(() => {})
+				return { ok: false, reason: 'blocked' }
+			}
+			const analyser = ctx.createAnalyser()
+			analyser.fftSize = ANALYSER_FFT_SIZE
+			// Light smoothing: the visualizer runs its own envelopes and needs
+			// transients intact for beat detection.
+			analyser.smoothingTimeConstant = 0.3
+
+			try {
+				switch (mode) {
+					case 'capture':
+						// Re-narrowed for the type; tapMode() only picks capture when this holds.
+						if (!canCapture(audio)) throw new Error('captureStream vanished')
+						attachCapture(audio, ctx, analyser)
+						break
+					case 'routed':
+						ctx.createMediaElementSource(audio).connect(analyser)
+						analyser.connect(ctx.destination)
+						break
+				}
+			} catch (err) {
+				console.warn('[radio] audio analysis unavailable', err)
+				void ctx.close().catch(() => {})
+				return { ok: false, reason: 'failed' }
+			}
+			internal.tap = { mode, ctx, analyser }
+			ctx.addEventListener('statechange', ensureTapRunning)
+			if (!internal.state.wantPlaying) void ctx.suspend().catch(() => {})
+			return { ok: true, analyser }
+		})
+		return internal.tapPending
 	}
 
 	const toggle = () => {
@@ -395,6 +562,9 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		// Becoming visible again.
 		if (internal.state.wantPlaying) {
 			void requestWakeLock()
+			// A routed context can be suspended while hidden even though the element
+			// kept "playing"; recheck it whether or not we reconnect below.
+			ensureTapRunning()
 			// The backgrounded stream almost certainly stalled/dropped. If the audio
 			// isn't actively progressing, do exactly one clean reconnect to resume.
 			if (audio.paused || audio.readyState < 3) {
@@ -435,6 +605,9 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 			listener({ ...internal.state })
 			return () => internal.listeners.delete(listener)
 		},
+		enableAnalysis,
+		getAnalyser: () => internal.tap?.analyser ?? null,
+		canAnalyse: () => tapMode() !== null,
 	}
 
 	window.__radioPlayer = player
