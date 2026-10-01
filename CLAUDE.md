@@ -118,6 +118,11 @@ On `/radio`, once the session is tapped (here or in the sandbox), the glow pulse
 - `?drift=<amp>&driftSpeed=<x>` slowly drifts the blobs. Unlike `?pulse`, it does nothing under reduced motion.
 - `?theme=light|dark` forces the colour scheme.
 - `?pulse=<0–3>` sets the pulse strength; a bare `?pulse` means 1, and `0` forces it off. It writes the session intent, overriding reduced motion. With `?pulse` > 0, the page's own play button performs the tap inside that click.
+- `?track=<filename>` is **pinned mode**, used by lofi-radio's scene editor (as an iframe preview) and its recorder:
+  - It shows that one track from `/api/tracks` and never opens `/stream` or the now-playing feed. `connect()` refuses while pinned, so the watchdog and resume paths can't reopen the stream.
+  - Instead of the stream, it decodes the track's source MP3 (`/api/tracks/:filename/audio`) and plays it **silently** (zero-gain sink) into the analyser. The pulse then follows the scene's own audio, which is what the recorder muxes in. `?at=<ms>` is where the play button starts it.
+  - The recorder drives it through `window.__radioScene` (`ready`, `play(atMs)`, `pause()`).
+  - The editor drives it with `postMessage`, accepted only from the parent frame: `radio-scene:play`, `radio-scene:pause`, and `radio-scene:pulse {query}`. The last retunes mode, knobs and strength live, through `parsePulseExperiment`; settings absent from the query return to defaults. The page answers `radio-scene:ready` once the audio is decoded.
 
 Drift and pulse compose. While pulsing, the 24fps static drift repaint stops and each pulse child adds its drift as a translate: the delta between `computeBlobs(colors, opts, phase)` and the phase-0 geometry, so clamping matches the static render. Everything stays compositor-only.
 

@@ -245,7 +245,7 @@ const platforms = [
 			setPulseIntent,
 			type PulseDriver,
 		} from '../../lib/glow-pulse-driver'
-		import { parsePulseExperiment } from '../../lib/pulse-params'
+		import { parsePulseExperiment, PULSE_KNOBS } from '../../lib/pulse-params'
 
 		const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
 		const LISTENER_COUNT_POLL_INTERVAL_MS = 15000
@@ -453,15 +453,17 @@ const platforms = [
 			// `?pulse=<0–3>` sets the pulse strength from the URL (bare `?pulse` = 1),
 			// e.g. for recordings. It is an explicit choice, so it writes the session
 			// intent (and so wins over reduced motion); `?pulse=0` forces it off.
-			const pulseParam = params.get('pulse')
-			const pulseAmountParam = (() => {
-				if (pulseParam === null) return null
-				if (pulseParam === '') return 1
-				const value = Number(pulseParam)
+			const readPulseAmount = (source: URLSearchParams) => {
+				const raw = source.get('pulse')
+				if (raw === null) return null
+				if (raw === '') return 1
+				const value = Number(raw)
 				return Number.isFinite(value) ? Math.min(3, Math.max(0, value)) : null
-			})()
+			}
+			const pulseAmountParam = readPulseAmount(params)
 			if (pulseAmountParam !== null) setPulseIntent(pulseAmountParam > 0 ? 'on' : 'off')
-			const pulseAmount = pulseAmountParam && pulseAmountParam > 0 ? pulseAmountParam : 1
+			// `let`: the scene editor retunes a pinned preview live (see below).
+			let pulseAmount = pulseAmountParam && pulseAmountParam > 0 ? pulseAmountParam : 1
 			const pulseWanted = () => {
 				const intent = getPulseIntent()
 				return intent ? intent === 'on' : !reducedMotion
@@ -523,6 +525,39 @@ const platforms = [
 					player.canAnalyse()
 				if (wantsTap) startTap()
 				else player.toggle()
+			}
+
+			// Live retuning for the lofi-radio scene editor, which embeds a pinned
+			// (`?track=`) page as its stage preview. It posts the scene's pulse settings
+			// as the same query string the URL carries, so slider moves restyle the
+			// glow without reloading the page (and re-decoding the scene's audio).
+			// Anything not in the message returns to its default, so the preview always
+			// matches the URL the recorder will open.
+			if (params.has('track') && window.parent !== window) {
+				window.addEventListener(
+					'message',
+					event => {
+						if (event.source !== window.parent) return
+						const data: unknown = event.data
+						if (typeof data !== 'object' || data === null || !('type' in data) || !('query' in data)) return
+						if (data.type !== 'radio-scene:pulse' || typeof data.query !== 'string') return
+
+						const next = new URLSearchParams(data.query)
+						const amount = readPulseAmount(next) ?? 0
+						setPulseIntent(amount > 0 ? 'on' : 'off')
+						if (amount > 0) pulseAmount = amount
+
+						const tuned = parsePulseExperiment(next)
+						glow.setOptions({
+							pulseMode: tuned.mode ?? 'bands',
+							...Object.fromEntries(PULSE_KNOBS.map(({ key }) => [key, tuned.knobs[key] ?? 1])),
+						})
+						pulseDriver.setSmoothing(tuned.smooth ?? 1)
+						pulseDriver.setDetection(tuned.detection)
+						pulseDriver.refresh()
+					},
+					{ signal },
+				)
 			}
 
 			pulseBtn.addEventListener(

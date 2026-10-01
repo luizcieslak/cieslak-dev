@@ -93,10 +93,39 @@ const METADATA_RESUME_REFRESH_MIN_INTERVAL_MS = 5_000
 const AUDIO_RESUME_TIMEOUT_MS = 1000
 const ANALYSER_FFT_SIZE = 2048
 
+/**
+ * Pinned mode's scene audio, for the promo-video recorder and the scene
+ * editor's preview (see `createSceneAudio`).
+ */
+export type RadioScene = {
+	/** Resolves once the source file is decoded; false if it couldn't be. */
+	ready: Promise<boolean>
+	/** Play the scene's audio (silently, into the analyser) from `atMs`. */
+	play: (atMs: number) => void
+	pause: () => void
+}
+
 declare global {
 	interface Window {
 		__radioPlayer?: RadioPlayer
+		__radioScene?: RadioScene
 	}
+}
+
+/**
+ * Messages the scene editor (the parent frame) sends to a pinned preview, and
+ * the one the preview sends back. Prefixed so they can't collide with anything
+ * else posting to the window.
+ */
+type SceneMessage = { type: 'radio-scene:play'; atMs: number } | { type: 'radio-scene:pause' }
+
+function readSceneMessage(data: unknown): SceneMessage | null {
+	if (typeof data !== 'object' || data === null || !('type' in data)) return null
+	if (data.type === 'radio-scene:pause') return { type: 'radio-scene:pause' }
+	if (data.type === 'radio-scene:play' && 'atMs' in data && typeof data.atMs === 'number' && Number.isFinite(data.atMs)) {
+		return { type: 'radio-scene:play', atMs: Math.max(0, data.atMs) }
+	}
+	return null
 }
 
 export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlayer {
@@ -130,6 +159,8 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 	const pinnedFilename = params.get('track')
 	const themeParam = params.get('theme')
 	const pinnedTheme: RadioTrack['theme'] = themeParam === 'light' || themeParam === 'dark' ? themeParam : undefined
+	// `?at=<ms>`: where the scene starts, for a play click on a pinned page.
+	const pinnedAtMs = Math.max(0, Number(params.get('at')) || 0)
 
 	// Per-page-lifetime id so duplicated tabs cannot inherit the same sessionStorage
 	// value and fight over one listener slot. Astro client-side navigation keeps
@@ -188,6 +219,94 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 		}
 		startSSEHeartbeat()
 	}
+
+	/**
+	 * Pinned mode plays the SCENE'S OWN AUDIO — the source file, decoded and
+	 * started at the scene's offset — so the glow pulses to exactly the audio the
+	 * recorder later muxes in, not to whatever the station is playing.
+	 *
+	 * It plays silently: the analyser feeds a zero-gain sink. In the editor's
+	 * preview the editor itself is what you hear, and a recording takes its audio
+	 * from the source file, so an audible copy here would only double it. Decoded
+	 * rather than played through <audio> because the library is VBR, where element
+	 * seeks are only as precise as the file's coarse Xing table — hundreds of ms
+	 * off, which would put every kick out of step with the muxed audio.
+	 */
+	const createSceneAudio = (filename: string): { scene: RadioScene; analyser: AnalyserNode; resume: () => Promise<void> } => {
+		const ctx = new AudioContext()
+		const analyser = ctx.createAnalyser()
+		analyser.fftSize = ANALYSER_FFT_SIZE
+		analyser.smoothingTimeConstant = 0.3
+		const sink = ctx.createGain()
+		sink.gain.value = 0
+		analyser.connect(sink).connect(ctx.destination)
+
+		let buffer: AudioBuffer | null = null
+		let source: AudioBufferSourceNode | null = null
+
+		const setPlaying = (playing: boolean) => {
+			internal.state = { ...internal.state, wantPlaying: playing, playing, hasInteracted: true }
+			emit()
+		}
+
+		const stopSource = () => {
+			if (!source) return
+			const current = source
+			source = null
+			current.onended = null
+			try {
+				current.stop()
+			} catch {}
+		}
+
+		const ready = (async () => {
+			try {
+				const url = `${internal.api}/api/tracks/${encodeURIComponent(filename)}/audio`
+				const response = await fetch(url)
+				if (!response.ok) throw new Error(`HTTP ${response.status}`)
+				buffer = await ctx.decodeAudioData(await response.arrayBuffer())
+				return true
+			} catch (err) {
+				console.error('[radio] could not load the pinned track audio', err)
+				return false
+			}
+		})()
+
+		const scene: RadioScene = {
+			ready,
+			play: atMs => {
+				if (!buffer) return
+				// Without activation (a cross-origin preview, a headless recorder) this
+				// may not start; the editor's iframe allows autoplay and the recorder
+				// launches with a no-gesture autoplay policy for exactly that reason.
+				void ctx.resume()
+				stopSource()
+				const next = ctx.createBufferSource()
+				next.buffer = buffer
+				next.connect(analyser)
+				next.onended = () => {
+					if (source !== next) return
+					source = null
+					setPlaying(false)
+				}
+				next.start(0, Math.min(atMs / 1000, buffer.duration))
+				source = next
+				setPlaying(true)
+			},
+			pause: () => {
+				stopSource()
+				setPlaying(false)
+			},
+		}
+
+		const resume = async () => {
+			await ctx.resume()
+		}
+
+		return { scene, analyser, resume }
+	}
+
+	const pinnedScene = pinnedFilename ? createSceneAudio(pinnedFilename) : null
 
 	const loadPinnedTrack = async (filename: string) => {
 		try {
@@ -301,6 +420,10 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 	}
 
 	const connect = () => {
+		// Every path that (re)opens /stream comes through here — the watchdog,
+		// visibility and pageshow recovery included — so this one guard keeps a
+		// pinned page off the broadcast whatever its playback state says.
+		if (pinnedFilename) return
 		if (internal.reconnectTimer) {
 			clearTimeout(internal.reconnectTimer)
 			internal.reconnectTimer = null
@@ -402,6 +525,13 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 	}
 
 	const enableAnalysis = (): Promise<AnalysisResult> => {
+		// Pinned: the analyser is the scene audio's, ready as soon as it decodes.
+		// Resumed here so a click inside the page counts as the activation.
+		if (pinnedScene) {
+			const { analyser, resume, scene } = pinnedScene
+			void resume()
+			return scene.ready.then((ok): AnalysisResult => (ok ? { ok: true, analyser } : { ok: false, reason: 'failed' }))
+		}
 		if (internal.tap) {
 			ensureTapRunning()
 			return Promise.resolve({ ok: true, analyser: internal.tap.analyser })
@@ -460,9 +590,13 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 	}
 
 	const toggle = () => {
-		// Pinned mode is for filming a still page; the audio comes from the source
-		// file, so nothing here may open /stream.
-		if (pinnedFilename) return
+		// Pinned mode never opens /stream: play/pause drives the scene's own audio,
+		// starting at `?at=`.
+		if (pinnedScene) {
+			if (internal.state.wantPlaying) pinnedScene.scene.pause()
+			else pinnedScene.scene.play(pinnedAtMs)
+			return
+		}
 		if (!internal.state.wantPlaying) {
 			internal.state = { ...internal.state, wantPlaying: true, hasInteracted: true }
 			void requestWakeLock()
@@ -606,14 +740,31 @@ export function getRadioPlayer(audio: HTMLAudioElement, api: string): RadioPlaye
 			return () => internal.listeners.delete(listener)
 		},
 		enableAnalysis,
-		getAnalyser: () => internal.tap?.analyser ?? null,
-		canAnalyse: () => tapMode() !== null,
+		getAnalyser: () => (pinnedScene ? pinnedScene.analyser : (internal.tap?.analyser ?? null)),
+		canAnalyse: () => (pinnedScene ? true : tapMode() !== null),
 	}
 
 	window.__radioPlayer = player
 
-	if (pinnedFilename) {
+	if (pinnedFilename && pinnedScene) {
 		void loadPinnedTrack(pinnedFilename)
+
+		// The recorder drives the scene through this hook; the scene editor, which
+		// embeds the page in an iframe, drives it with postMessage and is told when
+		// the audio is ready so it can sync a preview that is already playing.
+		window.__radioScene = pinnedScene.scene
+		const inFrame = window.parent !== window
+		if (inFrame) {
+			window.addEventListener('message', event => {
+				if (event.source !== window.parent) return
+				const message = readSceneMessage(event.data)
+				if (message?.type === 'radio-scene:play') pinnedScene.scene.play(message.atMs)
+				else if (message?.type === 'radio-scene:pause') pinnedScene.scene.pause()
+			})
+			void pinnedScene.scene.ready.then(ok => {
+				if (ok) window.parent.postMessage({ type: 'radio-scene:ready' }, '*')
+			})
+		}
 	} else {
 		void refreshNowPlaying()
 		connectMetadataEvents()
