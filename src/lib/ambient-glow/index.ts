@@ -67,6 +67,12 @@ export interface GlowHandle {
 	/** The blobs currently rendered, majors first in rank order. */
 	getBlobs(): GlowBlob[]
 	/**
+	 * The colour of the blob each of `bandCount` spectrum bands drives (null if
+	 * none), using the same theme-aware mapping as the pulse — for UIs that draw
+	 * the spectrum in the blobs' colours.
+	 */
+	getBandColors(bandCount: number): Array<Rgb | null>
+	/**
 	 * Drive the glow from audio features. The first frame swaps the static layers
 	 * for a per-blob layer animated with transform/opacity only; null swaps back.
 	 */
@@ -427,6 +433,18 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		},
 		getBlobs() {
 			return computeBlobs(lastColors, options)
+		},
+		getBandColors(bandCount) {
+			const majors = computeBlobs(lastColors, options).filter(blob => blob.kind === 'major')
+			const { slotOf, count } = audioSlots(majors, backdrop)
+			const colors: Array<Rgb | null> = new Array(bandCount).fill(null)
+			majors.forEach(blob => {
+				const s = slotOf[blob.rank]
+				if (s === null || s === undefined) return
+				const [start, end] = bandRange(s, count, bandCount)
+				for (let i = start; i < end; i++) colors[i] = blob.color
+			})
+			return colors
 		},
 		setPulse,
 		destroy() {
@@ -874,12 +892,20 @@ function readBackdrop(el: Element | null): Rgb | null {
 }
 
 /**
- * Which spectrum band drives the major blob of this rank. Ranks are spread
- * across the whole spectrum: first blob = lowest band, last = highest.
+ * The bands [start, end) that audio slot `slot` of `slotCount` listens to. The
+ * spectrum is split evenly, so EVERY band drives some blob: 5 slots over 8 bands
+ * get 1–2 bands each, 2 slots get the lows (0–3) and the highs (4–7).
+ *
+ * This replaced one-band-per-blob picking, which skipped bands outright — 5
+ * blobs listened to bands 0, 2, 4, 5 and 7 only, and 2 visible blobs to 0 and 7,
+ * leaving the whole midrange driving nothing.
  */
-export function bandForRank(rank: number, majorCount: number, bandCount: number): number {
-	if (majorCount <= 1 || bandCount <= 1) return 0
-	return Math.round((rank * (bandCount - 1)) / (majorCount - 1))
+export function bandRange(slot: number, slotCount: number, bandCount: number): [number, number] {
+	if (bandCount <= 0) return [0, 0]
+	if (slotCount <= 1) return [0, bandCount]
+	const start = Math.min(bandCount - 1, Math.floor((slot * bandCount) / slotCount))
+	const end = Math.max(start + 1, Math.min(bandCount, Math.floor(((slot + 1) * bandCount) / slotCount)))
+	return [start, end]
 }
 
 /**
@@ -914,18 +940,36 @@ export function pulseTransforms(
 	const bass = n ? bands[0] : 0
 	const { slotOf, count } = audioSlots(majors, backdrop)
 	const slot = (rank: number) => slotOf[rank] ?? null
-	/** The band a blob listens to, or -1 for an unseen blob (it hears nothing). */
-	const bandIndex = (rank: number) => {
+	/** The bands a blob listens to, or null for an unseen blob (it hears nothing). */
+	const rangeOf = (rank: number): [number, number] | null => {
 		const s = slot(rank)
-		return n && s !== null ? bandForRank(s, count, n) : -1
+		return n && s !== null ? bandRange(s, count, n) : null
 	}
-	const bandOf = (rank: number) => bands[bandIndex(rank)] ?? 0
-	const onsetOf = (rank: number) => onsets[bandIndex(rank)] ?? 0
-	/** Blend of the bass and treble knobs by where the rank's band sits (0 = lowest). */
+	/** Sustained energy: the MEAN of the blob's bands, so a wide share isn't just its loudest band. */
+	const bandOf = (rank: number) => {
+		const range = rangeOf(rank)
+		if (!range) return 0
+		let sum = 0
+		for (let i = range[0]; i < range[1]; i++) sum += bands[i] ?? 0
+		return sum / (range[1] - range[0])
+	}
+	/** Hits: the STRONGEST onset in the blob's bands — a hat in any of them should land. */
+	const onsetOf = (rank: number) => {
+		const range = rangeOf(rank)
+		if (!range) return 0
+		let peak = 0
+		for (let i = range[0]; i < range[1]; i++) peak = Math.max(peak, onsets[i] ?? 0)
+		return peak
+	}
+	/**
+	 * Blend of the bass and treble knobs by the blob's place among the visible
+	 * ones: the first is all bass knob, the last all treble knob, so each knob at
+	 * 0 fully mutes its end of the spectrum.
+	 */
 	const bandWeight = (rank: number) => {
-		const index = bandIndex(rank)
-		if (index < 0) return 0
-		const position = n > 1 ? index / (n - 1) : 0
+		const s = slot(rank)
+		if (!n || s === null) return 0
+		const position = count > 1 ? s / (count - 1) : 0
 		return k.bass + (k.treble - k.bass) * position
 	}
 	/** The blob carrying the kick: the dominant colour that can actually be seen. */
@@ -1037,7 +1081,8 @@ export function pulseTransforms(
 		}
 
 		default: {
-			// 'bands': the original behaviour (byte-identical with all knobs at 1).
+			// 'bands': the original behaviour, with each blob on its share of the
+			// spectrum (see bandRange) rather than one sampled band.
 			// Bright passages spread the blobs outwards, dull ones pull them in.
 			const spread = a * 0.25 * (centroid - 0.4) * level
 			return {

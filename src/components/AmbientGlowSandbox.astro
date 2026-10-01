@@ -110,7 +110,7 @@ try {
 </figure>
 
 <script>
-	import { bandForRank, mount, type GlowHandle, type GlowOptions } from '../lib/ambient-glow'
+	import { mount, type GlowHandle, type GlowOptions } from '../lib/ambient-glow'
 	import { corsImageUrl } from '../lib/cors-image'
 	import type { PulseFrame } from '../lib/audio-pulse'
 	import { createPulseDriver, type PulseDriver } from '../lib/glow-pulse-driver'
@@ -295,11 +295,8 @@ try {
 		}
 
 		const refreshColors = (bandCount: number) => {
-			const majors = glow.getBlobs().filter(blob => blob.kind === 'major')
-			barColors = new Array<string | null>(bandCount).fill(null)
-			majors.forEach(({ rank, color }) => {
-				barColors[bandForRank(rank, majors.length, bandCount)] = `rgb(${color.r},${color.g},${color.b})`
-			})
+			// Same mapping the pulse uses: visible blobs only, each over its share.
+			barColors = glow.getBandColors(bandCount).map(color => (color ? `rgb(${color.r},${color.g},${color.b})` : null))
 			textColor = getComputedStyle(canvas).color
 		}
 

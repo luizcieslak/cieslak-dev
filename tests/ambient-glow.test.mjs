@@ -61,7 +61,8 @@ test('bass swells the dominant blob, treble the faintest', () => {
 	assert.ok(tb.majors[0].opacity > tb.majors[majorCount - 1].opacity)
 	assert.ok(tb.sideScale > 1)
 
-	const treble = frame({ level: 0.6, bands: [0, 0, 0, 0, 0, 0, 0, 1] })
+	// The faintest blob owns the top of the spectrum (bands 6–7 with 5 blobs).
+	const treble = frame({ level: 0.6, bands: [0, 0, 0, 0, 0, 0, 1, 1] })
 	const tt = pulseTransforms(blobs, treble, OPTS)
 	assert.equal(tt.majors[0].scale, 1)
 	assert.ok(tt.majors[majorCount - 1].scale > 1.4)
@@ -82,35 +83,52 @@ test('pulse transforms tolerate an empty spectrum and no blobs', () => {
 	assert.deepEqual(pulseTransforms([], frame({ level: 1 }), OPTS).majors, [])
 })
 
-import { bandForRank } from '../src/lib/ambient-glow/index.ts'
+import { bandRange } from '../src/lib/ambient-glow/index.ts'
 
-test('bandForRank spreads blobs over the whole spectrum', () => {
+test('bandRange splits the spectrum so every band drives a blob', () => {
 	assert.deepEqual(
-		[0, 1, 2, 3, 4].map(r => bandForRank(r, 5, 8)),
-		[0, 2, 4, 5, 7],
+		[0, 1, 2, 3, 4].map(slot => bandRange(slot, 5, 8)),
+		[[0, 1], [1, 3], [3, 4], [4, 6], [6, 8]],
 	)
-	assert.deepEqual(
-		[0, 1].map(r => bandForRank(r, 2, 8)),
-		[0, 7],
-	)
-	assert.equal(bandForRank(0, 1, 8), 0)
-	assert.equal(bandForRank(3, 12, 1), 0)
-	// Every rank lands inside the spectrum for all slider-reachable counts.
-	for (let m = 1; m <= 12; m++)
-		for (let r = 0; r < m; r++) {
-			const b = bandForRank(r, m, 8)
-			assert.ok(b >= 0 && b < 8)
+	// Two visible blobs: the lows and the highs, nothing in between dropped.
+	assert.deepEqual([0, 1].map(slot => bandRange(slot, 2, 8)), [[0, 4], [4, 8]])
+	assert.deepEqual(bandRange(0, 1, 8), [0, 8])
+	assert.deepEqual(bandRange(0, 3, 0), [0, 0])
+	// For every slider-reachable count: each range is non-empty and inside the
+	// spectrum, and when there are no more slots than bands, the ranges tile it.
+	for (let m = 1; m <= 12; m++) {
+		const ranges = Array.from({ length: m }, (_, slot) => bandRange(slot, m, 8))
+		ranges.forEach(([start, end]) => assert.ok(start >= 0 && end <= 8 && end > start))
+		if (m <= 8) {
+			assert.equal(ranges[0][0], 0)
+			assert.equal(ranges[m - 1][1], 8)
+			ranges.slice(1).forEach(([start], i) => assert.equal(start, ranges[i][1]))
 		}
+	}
 })
 
-test('middle-rank blobs follow their own band', () => {
+test('middle-rank blobs follow their own share of the spectrum', () => {
 	const bands = new Array(8).fill(0)
-	bands[bandForRank(2, majorCount, 8)] = 1
+	const [start, end] = bandRange(2, majorCount, 8)
+	for (let i = start; i < end; i++) bands[i] = 1
 	const t = pulseTransforms(blobs, frame({ level: 0.6, bands }), OPTS)
 	t.majors.forEach((p, rank) => {
 		if (rank === 2) assert.ok(p.scale > 1.4)
 		else assert.equal(p.scale, 1)
 	})
+})
+
+test('a hit in any band of a blob\'s share lands on it (transients)', () => {
+	// Rank 1 owns bands 1–2 with 5 blobs; a hit on band 2 alone must still pop it.
+	const onsets = [0, 0, 1, 0, 0, 0, 0, 0]
+	const t = pulseTransforms(blobs, frame({ level: 0.6, onsets }), { ...OPTS, pulseMode: 'transients' })
+	assert.ok(t.majors[1].scale > 1.3)
+})
+
+test('with two visible blobs the midrange still moves something', () => {
+	const mids = frame({ level: 1, bands: [0, 0, 0, 1, 1, 0, 0, 0] })
+	const dark = pulseTransforms(WIL, mids, { ...OPTS, pulseMode: 'bands' }, DARK_PAGE).majors.map(m => m.scale)
+	assert.ok(dark[0] > 1 && dark[1] > 1, 'band 3 drives the low blob, band 4 the high one')
 })
 
 test('drift 0 is byte-identical to the golden static render at any phase', () => {
@@ -312,3 +330,54 @@ test('knobs at 0 mute their feature', () => {
 function majorsOf(list) {
 	return list.filter(b => b.kind === 'major')
 }
+
+// ── Theme-aware band mapping ────────────────────────────────────────────────
+import { audioSlots, contrastRatio, VISIBLE_CONTRAST } from '../src/lib/ambient-glow/index.ts'
+
+const DARK_PAGE = { r: 0x1c, g: 0x06, b: 0x15 }
+const LIGHT_PAGE = { r: 0xf7, g: 0xee, b: 0xd2 }
+/** Five majors like the "Wil" cover: two reds, then three near-black maroons. */
+const WIL = [
+	{ r: 192, g: 64, b: 64 },
+	{ r: 192, g: 64, b: 64 },
+	{ r: 64, g: 0, b: 0 },
+	{ r: 64, g: 0, b: 0 },
+	{ r: 64, g: 0, b: 0 },
+].map((color, rank) => ({ kind: 'major', rank, color, x: 50, y: 50, radiusX: 30, radiusY: 30, stops: [] }))
+
+test('contrast: maroon disappears on the dark page, red does not', () => {
+	assert.ok(contrastRatio(WIL[2].color, DARK_PAGE) < VISIBLE_CONTRAST)
+	assert.ok(contrastRatio(WIL[0].color, DARK_PAGE) >= VISIBLE_CONTRAST)
+	assert.ok(contrastRatio(WIL[2].color, LIGHT_PAGE) >= VISIBLE_CONTRAST)
+})
+
+test('audio slots skip blobs the page hides, keeping rank order', () => {
+	assert.deepEqual(audioSlots(WIL, DARK_PAGE), { slotOf: [0, 1, null, null, null], count: 2 })
+	assert.deepEqual(audioSlots(WIL, LIGHT_PAGE), { slotOf: [0, 1, 2, 3, 4], count: 5 })
+})
+
+test('no backdrop, or fewer than two visible blobs, keeps the original mapping', () => {
+	assert.deepEqual(audioSlots(WIL, null), { slotOf: [0, 1, 2, 3, 4], count: 5 })
+	const oneVisible = WIL.map((blob, rank) => (rank === 0 ? blob : { ...blob, color: { r: 0x1c, g: 0x06, b: 0x15 } }))
+	assert.deepEqual(audioSlots(oneVisible, DARK_PAGE), { slotOf: [0, 1, 2, 3, 4], count: 5 })
+})
+
+test('on the dark page the treble moves a visible blob, not a hidden one', () => {
+	const trebleOnly = frame({ level: 1, bands: [0, 0, 0, 0, 0, 0, 0, 1] })
+	const opts = { ...OPTS, pulseMode: 'bands' }
+	const dark = pulseTransforms(WIL, trebleOnly, opts, DARK_PAGE).majors.map(m => m.scale)
+	// Without the backdrop the treble lands on rank 4, an invisible maroon.
+	const blind = pulseTransforms(WIL, trebleOnly, opts).majors.map(m => m.scale)
+	assert.ok(blind[4] > 1 && blind[1] === 1)
+	// With it, the treble goes to the last VISIBLE blob, and the hidden ones hear nothing.
+	assert.ok(dark[1] > 1)
+	assert.deepEqual(dark.slice(2), [1, 1, 1])
+})
+
+test('boombap hats sparkle visible blobs on the dark page', () => {
+	const hats = frame({ level: 1, onsets: [0, 0, 0, 0, 0, 0, 0, 1], bands: new Array(8).fill(0) })
+	const opts = { ...OPTS, pulseMode: 'boombap' }
+	const dark = pulseTransforms(WIL, hats, opts, DARK_PAGE).majors.map(m => m.scale)
+	assert.ok(dark[1] > 1, 'the upper visible blob takes the hats')
+	assert.deepEqual(dark.slice(2), [1, 1, 1])
+})
