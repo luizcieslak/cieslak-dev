@@ -173,6 +173,17 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 
 	const onLoad = () => schedule(true)
 	img.addEventListener('load', onLoad)
+
+	// The page colour behind the glow, so the pulse can hand the spectrum only to
+	// blobs that actually show against it (see audioSlots). Re-read when the
+	// theme flips — a class/data attribute on <html> — since a blob that stands
+	// out on a dark page can vanish on a light one and vice versa.
+	let backdrop = readBackdrop(parent)
+	const themeObserver = new MutationObserver(() => {
+		backdrop = readBackdrop(parent)
+		if (pulseFrame) renderPulse(pulseFrame)
+	})
+	themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] })
 	if (img.complete && img.naturalWidth) schedule(true)
 
 	function schedule(needsExtract: boolean) {
@@ -300,7 +311,7 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		// Render both slots so the outgoing one keeps moving while it fades.
 		pulseSlots?.forEach(slot => {
 			if (slot.els.length === 0) return
-			const t = pulseTransforms(slot.blobs, frame, options)
+			const t = pulseTransforms(slot.blobs, frame, options, backdrop)
 			const drift = phase !== 0 ? driftDelta(slot.blobs, slot.colors, slot.opts, phase) : null
 			slot.el.style.transform = `translate(-50%, -50%) scale(${t.layerScale})`
 			slot.el.style.filter = t.filter
@@ -420,6 +431,7 @@ export function mount(img: HTMLImageElement, userOptions: GlowOptions = {}): Glo
 		setPulse,
 		destroy() {
 			img.removeEventListener('load', onLoad)
+			themeObserver.disconnect()
 			destroyed = true
 			stopDrift()
 			// Dropped so a later setDrift(true) can't restart the loop against the
@@ -795,6 +807,73 @@ export function isPulseMode(value: unknown): value is PulseMode {
 }
 
 /**
+ * WCAG contrast ratio between two colours: 1 = identical, 21 = black on white.
+ * Used to judge whether a blob can be seen against the page behind the glow.
+ */
+export function contrastRatio(a: Rgb, b: Rgb): number {
+	const channel = (value: number) => {
+		const c = value / 255
+		return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+	}
+	const luminance = ({ r, g, b: blue }: Rgb) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(blue)
+	const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+	return (hi + 0.05) / (lo + 0.05)
+}
+
+/**
+ * Below this contrast with the page, a blurred, semi-transparent blob reads as
+ * background rather than colour. Calibrated on a real case: a deep maroon
+ * (64,0,0) blob on the dark radio page measures 1.12 and is invisible, while the
+ * cover's red (192,64,64) measures 3.7 and reads clearly.
+ */
+export const VISIBLE_CONTRAST = 1.6
+
+/**
+ * Which "audio slot" each major blob gets, by rank — the position it takes when
+ * the spectrum is spread across blobs.
+ *
+ * Only blobs visible against `backdrop` get a slot, in their original rank
+ * (intensity) order, so the whole spectrum — bass to treble, and the kick and
+ * hats that boombap reads off the first and last slots — always lands on colour
+ * you can see. Without this, a cover whose upper ranks are dark is "deaf" from
+ * the mids up on a dark page (and a pale one on a light page): that half of the
+ * music moves nothing visible, so the motion that remains looks out of step.
+ *
+ * With no backdrop, or fewer than two visible blobs, every blob keeps its rank
+ * as its slot — exactly the original mapping.
+ */
+export function audioSlots(majors: GlowBlob[], backdrop: Rgb | null): { slotOf: Array<number | null>; count: number } {
+	const all = { slotOf: majors.map((_, rank) => rank), count: majors.length }
+	if (!backdrop) return all
+	const ordered = [...majors].sort((a, b) => a.rank - b.rank)
+	const visible = ordered.filter(blob => contrastRatio(blob.color, backdrop) >= VISIBLE_CONTRAST)
+	if (visible.length < 2) return all
+	const slotOf: Array<number | null> = majors.map(() => null)
+	visible.forEach((blob, slot) => {
+		slotOf[blob.rank] = slot
+	})
+	return { slotOf, count: visible.length }
+}
+
+/**
+ * The first opaque background behind `el`, walking up the tree; null when there
+ * is none (nothing to judge visibility against, so the pulse keeps its
+ * original, theme-blind mapping).
+ */
+function readBackdrop(el: Element | null): Rgb | null {
+	let node = el
+	while (node) {
+		const match = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/.exec(
+			getComputedStyle(node).backgroundColor,
+		)
+		const alpha = match?.[4] === undefined ? 1 : Number(match[4])
+		if (match && alpha >= 0.5) return { r: Number(match[1]), g: Number(match[2]), b: Number(match[3]) }
+		node = node.parentElement
+	}
+	return null
+}
+
+/**
  * Which spectrum band drives the major blob of this rank. Ranks are spread
  * across the whole spectrum: first blob = lowest band, last = highest.
  */
@@ -804,14 +883,17 @@ export function bandForRank(rank: number, majorCount: number, bandCount: number)
 }
 
 /**
- * Map an audio frame onto per-blob deformations. Blob rank r (0 = most intense
- * colour) listens to the band at the same relative position, so bass drives the
- * dominant blob and treble the faintest. A silent frame is the identity.
+ * Map an audio frame onto per-blob deformations. Each visible blob's audio slot
+ * (see audioSlots; 0 = most intense visible colour) listens to the band at the
+ * same relative position, so bass drives the dominant blob and treble the
+ * faintest. Blobs that can't be seen against `backdrop` get no band. A silent
+ * frame is the identity.
  */
 export function pulseTransforms(
 	blobs: GlowBlob[],
 	frame: PulseFrame,
 	opts: Required<GlowOptions>,
+	backdrop: Rgb | null = null,
 ): GlowPulse {
 	const a = Math.max(0, opts.pulseAmount)
 	const knob = (value: number) => (Number.isFinite(value) ? Math.max(0, value) : 1)
@@ -830,14 +912,26 @@ export function pulseTransforms(
 	for (let i = trebleStart; i < n; i++) treble += bands[i]
 	treble = n > trebleStart ? treble / (n - trebleStart) : 0
 	const bass = n ? bands[0] : 0
-	const bandIndex = (rank: number) => (n ? bandForRank(rank, majors.length, n) : -1)
+	const { slotOf, count } = audioSlots(majors, backdrop)
+	const slot = (rank: number) => slotOf[rank] ?? null
+	/** The band a blob listens to, or -1 for an unseen blob (it hears nothing). */
+	const bandIndex = (rank: number) => {
+		const s = slot(rank)
+		return n && s !== null ? bandForRank(s, count, n) : -1
+	}
 	const bandOf = (rank: number) => bands[bandIndex(rank)] ?? 0
 	const onsetOf = (rank: number) => onsets[bandIndex(rank)] ?? 0
 	/** Blend of the bass and treble knobs by where the rank's band sits (0 = lowest). */
 	const bandWeight = (rank: number) => {
-		const position = n > 1 ? bandIndex(rank) / (n - 1) : 0
+		const index = bandIndex(rank)
+		if (index < 0) return 0
+		const position = n > 1 ? index / (n - 1) : 0
 		return k.bass + (k.treble - k.bass) * position
 	}
+	/** The blob carrying the kick: the dominant colour that can actually be seen. */
+	const isLead = (rank: number) => slot(rank) === 0
+	/** The upper half of the visible blobs, where boombap puts the hats. */
+	const isUpper = (rank: number) => (slot(rank) ?? -1) >= count / 2
 	const still: BlobPulse = { scale: 1, dx: 0, dy: 0, opacity: 1 }
 	const base = { layerScale: 1, sideScale: 1, filter: 'none' }
 
@@ -849,7 +943,7 @@ export function pulseTransforms(
 				sideScale: 1 + a * 0.25 * beat * k.kick,
 				majors: majors.map(blob => ({
 					...still,
-					scale: 1 + a * beat * k.kick * (blob.rank === 0 ? 0.3 : 0.12),
+					scale: 1 + a * beat * k.kick * (isLead(blob.rank) ? 0.3 : 0.12),
 				})),
 			}
 
@@ -928,11 +1022,11 @@ export function pulseTransforms(
 				sideScale: 1 + a * 0.35 * flash,
 				filter: a > 0 && flash > 0.02 ? `brightness(${1 + a * 0.18 * flash})` : 'none',
 				majors: majors.map(blob => {
-					const hats = blob.rank >= majors.length / 2 ? onsetOf(blob.rank) * k.treble : 0
+					const hats = isUpper(blob.rank) ? onsetOf(blob.rank) * k.treble : 0
 					const phase = time * (0.5 + 0.13 * blob.rank) * Math.PI * 2 + blob.rank * 1.7
 					const wobble = a * hats * 1.5 * k.shimmer
 					return {
-						scale: 1 + a * ((blob.rank === 0 ? 0.35 : 0.08) * beat * k.kick + 0.15 * hats),
+						scale: 1 + a * ((isLead(blob.rank) ? 0.35 : 0.08) * beat * k.kick + 0.15 * hats),
 						// The snare spreads the blobs outward; hats jitter the small ones.
 						dx: (blob.x - 50) * 0.12 * a * flash + Math.sin(phase) * wobble,
 						dy: (blob.y - 50) * 0.12 * a * flash + Math.cos(phase) * wobble * 0.6,
@@ -952,7 +1046,7 @@ export function pulseTransforms(
 				sideScale: 1 + a * 0.2 * bass * k.bass,
 				majors: majors.map(blob => {
 					const band = bandOf(blob.rank) * bandWeight(blob.rank)
-					const kickBump = beat * k.kick * (blob.rank === 0 ? 0.15 : 0.06)
+					const kickBump = beat * k.kick * (isLead(blob.rank) ? 0.15 : 0.06)
 					const phase = time * (0.35 + 0.11 * blob.rank) * Math.PI * 2 + blob.rank * 1.7
 					const wobble = a * treble * (2 + opts.jitter * 0.12) * k.shimmer
 					return {

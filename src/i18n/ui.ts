@@ -40,7 +40,7 @@ export const ui = {
 		'glow.randomize': 'Randomize',
 		'glow.pulse.title': 'Make it pulse',
 		'glow.pulse.hint':
-			'Syncs the glow to the live radio: loudness grows it, beats kick it, and each colour blob follows one band of the spectrum below (bass → treble).',
+			'Syncs the glow to the live radio: loudness grows it, beats kick it, and the spectrum below is spread across the colour blobs you can see on this background (bass → treble).',
 		'glow.pulse.enable': '✨ Pulse with the radio',
 		'glow.pulse.play': 'Play radio',
 		'glow.pulse.pause': 'Pause radio',
@@ -75,7 +75,7 @@ export const ui = {
 		'glow.randomize': 'Aleatório',
 		'glow.pulse.title': 'Faça pulsar',
 		'glow.pulse.hint':
-			'Sincroniza o brilho com a rádio ao vivo: o volume faz ele crescer, as batidas dão um impulso e cada bolha de cor segue uma faixa do espectro abaixo (graves → agudos).',
+			'Sincroniza o brilho com a rádio ao vivo: o volume faz ele crescer, as batidas dão um impulso e o espectro abaixo é distribuído entre as bolhas de cor visíveis neste fundo (graves → agudos).',
 		'glow.pulse.enable': '✨ Pulsar com a rádio',
 		'glow.pulse.play': 'Tocar rádio',
 		'glow.pulse.pause': 'Pausar rádio',
