@@ -124,6 +124,7 @@ const labelOpen = t('radio.title')
 <script>
 	import { getRadioPlayer } from '../lib/radio-player'
 	import { mount } from '../lib/ambient-glow'
+	import { corsImageUrl } from '../lib/cors-image'
 
 	const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
 
@@ -214,12 +215,15 @@ const labelOpen = t('radio.title')
 					titleEl.textContent = track.title || ''
 					artistEl.textContent = track.artist || ''
 					const cover = track.albumArtUrl || track.coverUrl || ''
-					if (cover && coverEl.src !== cover) {
-						coverEl.src = cover
+					// Both images are crossorigin, so both load from the CORS-only cache
+					// entry (see cors-image.ts).
+					const coverSrc = cover ? corsImageUrl(cover) : ''
+					if (coverSrc && coverEl.src !== coverSrc) {
+						coverEl.src = coverSrc
 						coverEl.alt = track.title || ''
 					}
-					if (cover && glowSourceEl.src !== cover) {
-						glowSourceEl.src = cover
+					if (coverSrc && glowSourceEl.src !== coverSrc) {
+						glowSourceEl.src = coverSrc
 					}
 					callout.dataset.hasTrack = 'true'
 				} else {

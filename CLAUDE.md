@@ -113,6 +113,8 @@ Both drive their glow through [src/lib/glow-pulse-driver.ts](src/lib/glow-pulse-
 
 On `/radio`, once the session is tapped (here or in the sandbox), the glow pulses by default. Two things override that: the session-scoped on/off intent (`window.__radioPulseIntent`, survives client-side navigation), and `prefers-reduced-motion`, which defaults it off. Pulse layers are double-buffered, so track changes crossfade.
 
+**Cross-origin covers:** any `<img crossorigin='anonymous'>` showing a cover from the CDN must get its `src` through `corsImageUrl()` ([src/lib/cors-image.ts](src/lib/cors-image.ts)). The CDN sends CORS headers only to requests with an `Origin`, with no `Vary: Origin`, so a plain load of the same URL (the favicon set to the cover, Media Session artwork, lofi-radio's player on another localhost port) caches a CORS-less copy that then blocks the crossorigin `<img>`. The `?cors=1` marker keeps CORS loads in their own cache entry.
+
 **Recording mode** (promo clips, see `docs/video-recording.md` in lofi-radio's `campaign/dj-controls`). `/radio` query params:
 - `?stage` strips the page to cover, metadata and glow, and hides the Pulse toggle.
 - `?drift=<amp>&driftSpeed=<x>` slowly drifts the blobs. Unlike `?pulse`, it does nothing under reduced motion.

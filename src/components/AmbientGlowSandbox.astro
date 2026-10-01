@@ -111,6 +111,7 @@ try {
 
 <script>
 	import { bandForRank, mount, type GlowHandle, type GlowOptions } from '../lib/ambient-glow'
+	import { corsImageUrl } from '../lib/cors-image'
 	import type { PulseFrame } from '../lib/audio-pulse'
 	import { createPulseDriver, type PulseDriver } from '../lib/glow-pulse-driver'
 	import { PULSE_MODES, isPulseMode, type PulseMode } from '../lib/ambient-glow'
@@ -745,9 +746,12 @@ try {
 
 			const showCurrentCover = () => {
 				const track = player?.getState().track
-				const cover = track?.albumArtUrl || track?.coverUrl
+				const rawCover = track?.albumArtUrl || track?.coverUrl
 				// Tracks without art keep whatever image is showing.
-				if (!cover || img.src === cover) return
+				if (!rawCover) return
+				// CORS load from its own cache entry (see cors-image.ts).
+				const cover = corsImageUrl(rawCover)
+				if (img.src === cover) return
 				if (lastObjectUrl) {
 					URL.revokeObjectURL(lastObjectUrl)
 					lastObjectUrl = null

@@ -87,6 +87,7 @@ const labels = {
 <script>
 	import { getRadioPlayer } from '../lib/radio-player'
 	import { mount } from '../lib/ambient-glow'
+	import { corsImageUrl } from '../lib/cors-image'
 
 	const RADIO_PATH_RE = /\/(en|pt-br)\/radio\/?$/
 
@@ -175,8 +176,10 @@ const labels = {
 			titleEl.textContent = track?.title || ''
 			artistEl.textContent = track?.artist || ''
 			const cover = track?.albumArtUrl || track?.coverUrl || ''
-			if (cover && coverEl.src !== cover) {
-				coverEl.src = cover
+			// CORS load from its own cache entry: the glow reads it (see cors-image.ts).
+			const coverSrc = cover ? corsImageUrl(cover) : ''
+			if (coverSrc && coverEl.src !== coverSrc) {
+				coverEl.src = coverSrc
 				coverEl.alt = track?.title || ''
 			}
 			root.dataset.hasInteracted = state.hasInteracted ? 'true' : 'false'

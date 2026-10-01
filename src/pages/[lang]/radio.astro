@@ -246,6 +246,7 @@ const platforms = [
 			type PulseDriver,
 		} from '../../lib/glow-pulse-driver'
 		import { parsePulseExperiment, PULSE_KNOBS } from '../../lib/pulse-params'
+		import { corsImageUrl } from '../../lib/cors-image'
 
 		const RADIO_API = import.meta.env.PUBLIC_RADIO_API_URL
 		const LISTENER_COUNT_POLL_INTERVAL_MS = 15000
@@ -369,8 +370,11 @@ const platforms = [
 				artistEl.textContent = track?.artist || ''
 				albumEl.textContent = track?.album || ''
 				const cover = track?.albumArtUrl || track?.coverUrl || ''
-				if (cover && coverEl.src !== cover) {
-					coverEl.src = cover
+				// The glow reads this image's pixels, so it loads as a CORS request,
+				// from its own cache entry (see cors-image.ts).
+				const coverSrc = cover ? corsImageUrl(cover) : ''
+				if (coverSrc && coverEl.src !== coverSrc) {
+					coverEl.src = coverSrc
 					coverEl.alt = track?.title ? `${track.title} ${labelCoverSuffix}` : ''
 				}
 
